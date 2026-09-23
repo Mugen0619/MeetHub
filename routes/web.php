@@ -27,6 +27,14 @@ Route::middleware('auth')->group(function () {
     Volt::route('events/{event}', 'pages.events.show')
         ->whereNumber('event')
         ->name('events.show');
+
+    Volt::route('users/{user:username}', 'pages.users.show')
+        ->name('users.show');
+
+    // フォロー一覧(followings)・フォロワー一覧(followers)は同じ画面をtypeで切り替える
+    Volt::route('users/{user:username}/{type}', 'pages.users.follows')
+        ->whereIn('type', ['followings', 'followers'])
+        ->name('users.follows');
 });
 
 require __DIR__.'/auth.php';
