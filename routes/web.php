@@ -20,6 +20,10 @@ Route::middleware('auth')->group(function () {
     Volt::route('events/create', 'pages.events.create')
         ->name('events.create');
 
+    // マイ参加予定イベント一覧
+    Volt::route('events/participating', 'pages.events.participating')
+        ->name('events.participating');
+
     Volt::route('events/{event}/edit', 'pages.events.edit')
         ->name('events.edit');
 

@@ -76,6 +76,15 @@ docker compose down
 docker compose run --rm app php artisan test
 ```
 
+通常のテスト(`phpunit.xml`)はSQLiteのインメモリDBで実行する。参加申込みの同時実行制御(行ロック)はDB製品によって挙動が異なるため、`tests/Concurrency`のテストは本番と同じPostgreSQL上で、`phpunit.pgsql.xml`を使って実行する(全テストもあわせてPostgreSQLで実行される)。
+
+```bash
+# 初回のみ: テスト用データベースを作成
+docker compose exec pgsql psql -U meethub -d meethub -c "create database meethub_testing"
+
+docker compose run --rm app php artisan test --configuration=phpunit.pgsql.xml
+```
+
 ### コード品質チェック
 
 ```bash
@@ -88,4 +97,4 @@ docker compose run --rm app ./vendor/bin/phpstan analyse
 
 ## CI
 
-GitHub Actions(`.github/workflows/ci.yml`)で、push・PR時にLaravel Pint・Larastan・Pestのテストを自動実行する。
+GitHub Actions(`.github/workflows/ci.yml`)で、push・PR時にLaravel Pint・Larastan・Pestのテスト(SQLite・PostgreSQLの両方)を自動実行する。

@@ -24,4 +24,13 @@ class EventPolicy
     {
         return $user->id === $event->organizer_id;
     }
+
+    /**
+     * イベントの参加者一覧を閲覧できるか。
+     * 主催者本人のみ。参加者本人を含め、主催者以外には公開しない(要件定義書4.6節)。
+     */
+    public function viewParticipants(User $user, Event $event): bool
+    {
+        return $user->id === $event->organizer_id;
+    }
 }

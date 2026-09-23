@@ -13,6 +13,22 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    # 同時実行制御(行ロック)のテストを本番と同じPostgreSQLで実行するためのDB(phpunit.pgsql.xmlで使用)
+    services:
+      pgsql:
+        image: postgres:17
+        env:
+          POSTGRES_DB: meethub_testing
+          POSTGRES_USER: meethub
+          POSTGRES_PASSWORD: secret
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U meethub -d meethub_testing"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -61,3 +77,9 @@ jobs:
 
       - name: Run tests (Pest)
         run: php artisan test
+
+      - name: Run tests on PostgreSQL (Pest, including concurrency tests)
+        env:
+          # .envのDB_HOST(docker-composeのサービス名 pgsql)ではなく、CIのサービスコンテナに接続する
+          DB_HOST: 127.0.0.1
+        run: php artisan test --configuration=phpunit.pgsql.xml

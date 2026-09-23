@@ -118,4 +118,15 @@ class User extends Authenticatable
     {
         return $this->hasMany(Comment::class);
     }
+
+    /**
+     * ユーザーが参加申込みしたイベント一覧。
+     *
+     * @return BelongsToMany<Event, $this>
+     */
+    public function participatingEvents(): BelongsToMany
+    {
+        return $this->belongsToMany(Event::class, 'event_participations')
+            ->withPivot('created_at');
+    }
 }
