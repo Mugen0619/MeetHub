@@ -16,7 +16,7 @@ new #[Layout('layouts.app')] class extends Component
     /**
      * 表示対象のタブ。all: すべてのイベント / following: フォロー中の主催者のイベントのみ
      */
-    #[Url]
+    #[Url(except: 'all')]
     public string $tab = 'all';
 
     /**
