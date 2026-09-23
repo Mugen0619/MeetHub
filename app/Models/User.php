@@ -98,4 +98,24 @@ class User extends Authenticatable
     {
         return $this->followings()->whereKey($user->id)->exists();
     }
+
+    /**
+     * ユーザーが「興味あり」したイベントの記録一覧。
+     *
+     * @return HasMany<EventLike, $this>
+     */
+    public function eventLikes(): HasMany
+    {
+        return $this->hasMany(EventLike::class);
+    }
+
+    /**
+     * ユーザーが投稿したコメント一覧。
+     *
+     * @return HasMany<Comment, $this>
+     */
+    public function comments(): HasMany
+    {
+        return $this->hasMany(Comment::class);
+    }
 }
