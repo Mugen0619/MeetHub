@@ -9,7 +9,7 @@
 | エンティティ | 主なカラム | 備考 |
 |---|---|---|
 | User | id, username, email, password_hash, display_name, bio, avatar_url, created_at | |
-| Event | id, organizer_id(FK→User), title, description, location, starts_at, capacity, image_url, created_at, updated_at | organizer_idがイベント主催者。capacityは定員(1以上の整数を想定、null許容とするかは[TBD](./requirements.md#7-未決定事項tbd)) |
+| Event | id, organizer_id(FK→User), title, description, location, starts_at, capacity, image_url, created_at, updated_at | organizer_idがイベント主催者。capacityは定員(1以上の整数を想定、null許容とするかは[TBD](./requirements.md#7-未決定事項tbd))。organizer_idは`ON DELETE CASCADE`とし、**主催者がアカウントを削除した場合、そのユーザーが主催する全イベント(および紐づくコメント・いいね・参加申込み)も連鎖削除される**(意図した仕様。他の参加者への通知は行わない。今回の課題規模では許容する判断とした) |
 | EventLike | id, event_id(FK), user_id(FK), created_at | 「興味あり」。event_id + user_idでユニーク制約 |
 | Comment | id, event_id(FK), user_id(FK), body, created_at | |
 | Follow | id, follower_id(FK→User), followee_id(FK→User), created_at | follower_id + followee_idでユニーク制約 |
