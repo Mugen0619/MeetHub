@@ -7,10 +7,13 @@ RUN apt-get update -qq \
         libpq-dev \
         libzip-dev \
         libpng-dev \
+        libjpeg62-turbo-dev \
+        libwebp-dev \
         libonig-dev \
         libicu-dev \
         curl \
         gnupg \
+    && docker-php-ext-configure gd --with-jpeg --with-webp \
     && docker-php-ext-install pdo pdo_pgsql mbstring bcmath gd zip intl \
     && curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer \
     && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \

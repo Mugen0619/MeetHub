@@ -30,16 +30,6 @@ class EventFactory extends Factory
     }
 
     /**
-     * 定員なし(無制限)のイベント。
-     */
-    public function unlimited(): static
-    {
-        return $this->state(fn (array $attributes) => [
-            'capacity' => null,
-        ]);
-    }
-
-    /**
      * 開催日時が過去のイベント。
      */
     public function past(): static

@@ -33,8 +33,11 @@ new class extends Component
                     <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')" wire:navigate>
                         {{ __('Dashboard') }}
                     </x-nav-link>
-                    <x-nav-link :href="route('events.index')" :active="request()->routeIs('events.*')" wire:navigate>
+                    <x-nav-link :href="route('events.index')" :active="request()->routeIs('events.index') || request()->routeIs('events.show')" wire:navigate>
                         イベント
+                    </x-nav-link>
+                    <x-nav-link :href="route('events.create')" :active="request()->routeIs('events.create')" wire:navigate>
+                        イベント作成
                     </x-nav-link>
                 </div>
             </div>
@@ -87,8 +90,11 @@ new class extends Component
             <x-responsive-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')" wire:navigate>
                 {{ __('Dashboard') }}
             </x-responsive-nav-link>
-            <x-responsive-nav-link :href="route('events.index')" :active="request()->routeIs('events.*')" wire:navigate>
+            <x-responsive-nav-link :href="route('events.index')" :active="request()->routeIs('events.index') || request()->routeIs('events.show')" wire:navigate>
                 イベント
+            </x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('events.create')" :active="request()->routeIs('events.create')" wire:navigate>
+                イベント作成
             </x-responsive-nav-link>
         </div>
 

@@ -9,7 +9,7 @@
 
 ## 技術スタック(概要)
 
-PHP 8.5 + Laravel 13 + Livewire 4 + Blade + Tailwind CSS + PostgreSQL 17。詳細は[tech-stack.md](./docs/tech-stack.md)を参照。
+PHP 8.5 + Laravel 13 + Livewire 3.6(Volt) + Blade + Tailwind CSS + PostgreSQL 17。詳細は[tech-stack.md](./docs/tech-stack.md)を参照。
 
 ## ローカル開発環境
 
@@ -43,6 +43,9 @@ docker compose run --rm app npm run build
 
 # 7. マイグレーションを実行
 docker compose run --rm app php artisan migrate
+
+# 8. アップロード画像を公開するためのシンボリックリンク(public/storage)を作成
+docker compose run --rm app php artisan storage:link
 ```
 
 ※ ホストの5432番ポートが他プロジェクトのPostgreSQLで使用中の場合は、先にそちらを停止するか、`docker-compose.yml`のポートマッピングを変更すること(CLAUDE.mdのポート運用ルール参照)。
@@ -60,6 +63,12 @@ docker compose up -d app
 ```bash
 docker compose down
 ```
+
+### ファイル保存先(画像アップロード)
+
+`.env`の`FILESYSTEM_DISK`で切り替える。ローカル開発は`public`(`storage/app/public`に保存、AWS認証情報は不要)、本番は`s3`(ブラウザからS3へ署名付きURLで直接アップロード。`AWS_*`の設定が必要)。詳細は[tech-stack.md](./docs/tech-stack.md#ストレージ--aws連携)を参照。
+
+なお、アプリのタイムゾーンは`Asia/Tokyo`(`config/app.php`)で、イベントの開催日時は日本時間として入力・表示・「終了」判定する。
 
 ### テストの実行(Pest)
 
