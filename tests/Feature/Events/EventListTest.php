@@ -77,3 +77,75 @@ test('イベントが1ページの件数を超える場合はページ分割さ�
         ->call('nextPage')
         ->assertSee('13番目のイベント');
 });
+
+test('主催者名からプロフィール画面へのリンクが表示される', function () {
+    $this->actingAs(User::factory()->create());
+    $event = Event::factory()->create();
+
+    Volt::test('pages.events.index')
+        ->assertSee(route('users.show', $event->organizer));
+});
+
+test('「フォロー中」タブではフォロー中の主催者のイベントのみ表示される', function () {
+    $me = User::factory()->create();
+    $this->actingAs($me);
+    $followee = User::factory()->create();
+    $me->follow($followee);
+    Event::factory()->for($followee, 'organizer')->create(['title' => 'フォロー中の主催者のイベント']);
+    Event::factory()->create(['title' => 'フォローしていない主催者のイベント']);
+    Event::factory()->for($me, 'organizer')->create(['title' => '自分のイベント']);
+
+    Volt::test('pages.events.index')
+        ->assertSee('フォローしていない主催者のイベント')
+        ->set('tab', 'following')
+        ->assertSee('フォロー中の主催者のイベント')
+        ->assertDontSee('フォローしていない主催者のイベント')
+        ->assertDontSee('自分のイベント')
+        ->set('tab', 'all')
+        ->assertSee('フォローしていない主催者のイベント');
+});
+
+test('「フォロー中」タブでも開催日時を過ぎたイベントは表示されない', function () {
+    $me = User::factory()->create();
+    $this->actingAs($me);
+    $followee = User::factory()->create();
+    $me->follow($followee);
+    Event::factory()->for($followee, 'organizer')->past()->create(['title' => '終了したイベント']);
+
+    Volt::test('pages.events.index')
+        ->set('tab', 'following')
+        ->assertDontSee('終了したイベント')
+        ->assertSee('フォロー中の主催者の開催予定イベントはありません。');
+});
+
+test('タブの状態はURLのクエリで指定できる', function () {
+    $this->actingAs(User::factory()->create());
+    Event::factory()->create(['title' => 'フォローしていない主催者のイベント']);
+
+    $this->get(route('events.index', ['tab' => 'following']))
+        ->assertOk()
+        ->assertDontSee('フォローしていない主催者のイベント')
+        ->assertSee('フォロー中の主催者の開催予定イベントはありません。');
+});
+
+test('不正なタブの値は「すべて」として扱われる', function () {
+    $this->actingAs(User::factory()->create());
+    Event::factory()->create(['title' => 'だれかのイベント']);
+
+    Volt::test('pages.events.index')
+        ->set('tab', 'invalid')
+        ->assertSee('だれかのイベント');
+});
+
+test('タブを切り替えると1ページ目に戻る', function () {
+    $this->actingAs(User::factory()->create());
+    foreach (range(1, 13) as $i) {
+        Event::factory()->create(['starts_at' => now()->addHours($i)]);
+    }
+
+    Volt::test('pages.events.index')
+        ->call('nextPage')
+        ->assertSet('paginators.page', 2)
+        ->set('tab', 'following')
+        ->assertSet('paginators.page', 1);
+});

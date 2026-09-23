@@ -129,7 +129,9 @@ new #[Layout('layouts.app')] class extends Component
                     <dd class="text-gray-900">{{ $event->location }}</dd>
 
                     <dt class="font-medium text-gray-500">主催者</dt>
-                    <dd class="text-gray-900">{{ $event->organizer->display_name }}</dd>
+                    <dd class="text-gray-900">
+                        <a href="{{ route('users.show', $event->organizer) }}" wire:navigate class="hover:underline">{{ $event->organizer->display_name }}</a>
+                    </dd>
                 </dl>
 
                 <div>

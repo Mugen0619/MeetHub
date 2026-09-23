@@ -58,6 +58,9 @@ new class extends Component
                     </x-slot>
 
                     <x-slot name="content">
+                        <x-dropdown-link :href="route('users.show', auth()->user())" wire:navigate>
+                            マイページ
+                        </x-dropdown-link>
                         <x-dropdown-link :href="route('profile')" wire:navigate>
                             {{ __('Profile') }}
                         </x-dropdown-link>
@@ -106,6 +109,9 @@ new class extends Component
             </div>
 
             <div class="mt-3 space-y-1">
+                <x-responsive-nav-link :href="route('users.show', auth()->user())" wire:navigate>
+                    マイページ
+                </x-responsive-nav-link>
                 <x-responsive-nav-link :href="route('profile')" wire:navigate>
                     {{ __('Profile') }}
                 </x-responsive-nav-link>
