@@ -2,8 +2,10 @@
 
 use App\Models\Event;
 use App\Models\User;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 
 test('eventsテーブルが定義どおりのカラムで作成される', function () {
     expect(Schema::hasColumns('events', [
@@ -20,10 +22,36 @@ test('Factoryでイベントを作成できる', function () {
         ->and($event->capacity)->toBeInt();
 });
 
-test('capacityはnullで作成できる', function () {
-    $event = Event::factory()->unlimited()->create();
+test('capacityはnullを許容しない', function () {
+    expect(fn () => Event::factory()->create(['capacity' => null]))
+        ->toThrow(QueryException::class);
+});
 
-    expect($event->fresh()->capacity)->toBeNull();
+test('開催日時を過ぎたイベントは終了扱いになる', function () {
+    expect(Event::factory()->past()->make()->isEnded())->toBeTrue()
+        ->and(Event::factory()->make()->isEnded())->toBeFalse();
+});
+
+test('image_urlは保存パスを現在のディスクの公開URLに変換して返す', function () {
+    Storage::fake('public');
+    config(['filesystems.default' => 'public']);
+
+    $event = Event::factory()->make(['image_url' => 'events/sample.jpg']);
+
+    expect($event->image_url)->toBe(Storage::url('events/sample.jpg'))
+        ->and(Event::factory()->make(['image_url' => 'https://example.com/a.jpg'])->image_url)->toBe('https://example.com/a.jpg')
+        ->and(Event::factory()->make(['image_url' => null])->image_url)->toBeNull();
+});
+
+test('イベントを削除すると画像ファイルも削除される', function () {
+    Storage::fake('public');
+    config(['filesystems.default' => 'public']);
+    Storage::put('events/sample.jpg', 'dummy');
+    $event = Event::factory()->create(['image_url' => 'events/sample.jpg']);
+
+    $event->delete();
+
+    Storage::assertMissing('events/sample.jpg');
 });
 
 test('イベントから主催者を取得できる', function () {

@@ -39,8 +39,10 @@ Livewireはサーバーサイドでレンダリングした画面をAjaxで部�
 
 | 技術 | バージョン | 備考 |
 |---|---|---|
-| aws/aws-sdk-php | 3.3xx系 | イベント画像アップロード用のS3署名付きURL(presigned URL)発行に使用 |
-| league/flysystem-aws-s3-v3 | 3.35系 | LaravelのFilesystem抽象化からS3を操作するためのアダプタ(`config/filesystems.php`のs3ディスク) |
+| aws/aws-sdk-php | 3.396系 | イベント画像アップロード用のS3署名付きURL(presigned URL)発行に使用。`league/flysystem-aws-s3-v3`の依存として導入される(composer.jsonには直接記載しない) |
+| league/flysystem-aws-s3-v3 | 3.35系(`^3.35`) | LaravelのFilesystem抽象化からS3を操作するためのアダプタ(`config/filesystems.php`のs3ディスク) |
+
+画像アップロードは、Livewireの一時ファイルアップロード機能(`WithFileUploads`)のS3直接アップロードを利用する。`FILESYSTEM_DISK=s3`の場合、Livewireがサーバー側でS3の署名付きPUT URLを発行し、ブラウザがS3の`livewire-tmp/`へ直接アップロードする(画像データがアプリサーバーを経由しない)。保存確定時にS3内で`events/`配下へコピーする。ローカル開発では`FILESYSTEM_DISK=public`(ローカルファイルシステム)とし、AWS認証情報なしで開発できる(一時ファイルは非公開の`local`ディスク、確定後の画像は`public`ディスクに保存。`config/livewire.php`参照)。本番のS3バケットには、ブラウザからのPUTを許可するCORS設定と、`livewire-tmp/`の一時ファイルを削除するライフサイクルルールが必要になる(インフラ構築のIssueで対応)。
 
 ## ログ・死活監視
 
