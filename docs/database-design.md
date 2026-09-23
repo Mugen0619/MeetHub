@@ -13,15 +13,19 @@
 | EventLike | id, event_id(FK), user_id(FK), created_at | 「興味あり」。event_id + user_idでユニーク制約。付け外しのみで更新しないためupdated_atは持たない。event_id・user_idとも`ON DELETE CASCADE` |
 | Comment | id, event_id(FK), user_id(FK), body, created_at | bodyは1000文字以内(Issue #12で決定)。編集機能を持たないためupdated_atは持たない。削除は投稿者本人のみ(イベント主催者も他人のコメントは削除不可)。event_id・user_idとも`ON DELETE CASCADE` |
 | Follow | id, follower_id(FK→User), followee_id(FK→User), created_at | follower_id + followee_idでユニーク制約 |
-| EventParticipation | id, event_id(FK), user_id(FK), status(applied/cancelled), created_at, cancelled_at | 参加申込み(多対多の中間テーブル)。event_id + user_idでユニーク制約。現在の参加人数はstatus='applied'の行数をカウントする想定。取消し時に行を削除するかstatusを更新するかは実装フェーズで決定。※status更新方式(行を残す)を採る場合、ユニーク制約を`event_id + user_id`のままにすると取消し後の再申込みができなくなる(部分ユニークインデックス等の追加設計が必要になりうる。[要件定義書7節](./requirements.md#7-未決定事項tbd)参照) |
+| EventParticipation | id, event_id(FK), user_id(FK), created_at | 参加申込み(多対多の中間テーブル)。event_id + user_idでユニーク制約。**取消し時は行を削除する**(Issue #16で決定。status更新方式は不採用のため、status・cancelled_atカラムは持たない)。行が残らないため、ユニーク制約のままで取消し後の再申込みができる。申込み・削除のみで更新しないためupdated_atは持たない。現在の参加人数は、そのイベントの行数をCOUNTする。event_id・user_idとも`ON DELETE CASCADE` |
 
 ※以前の案にあった`RefreshToken`エンティティは、JWTのリフレッシュトークン運用のために設けていたものだったが、今回はLaravel標準のセッション認証(`web`ガード)を採用しJWTを実装しないため削除した。将来、外部API・モバイルクライアント向けに`api`ガード+JWTを追加する際は、その時点で改めてリフレッシュトークンの保存要否・設計を検討する([tech-stack.md](./tech-stack.md#認証)を参照)。
 
 ## 参加申込み・定員管理まわりの設計メモ
 
 - `EventParticipation`はEventとUserの多対多を表す中間テーブル。主催者自身の行は作成しない(要件定義書[4.6](./requirements.md#46-参加申込み定員管理多対多リレーション)を参照)。
-- 定員超過を防ぐための同時実行制御(行ロック・ユニーク制約+リトライ等の具体的な組み合わせ)は実装フェーズで設計する。
-- 参加人数の集計方法(都度COUNT/非正規化カウンタ列を`Event`に持つ等)も実装フェーズで比較検討する。
+- 定員超過を防ぐための同時実行制御は、**都度COUNT + 悲観ロック**とする(Issue #16で決定)。申込み処理(`Event::join`)はトランザクション内で対象`Event`の行を`SELECT ... FOR UPDATE`(`lockForUpdate()`)でロックし、そのイベントの`EventParticipation`をCOUNTして定員未満であることを確認してから行を追加する。同じイベントへの申込みはこのロックで直列化されるため、COUNTと登録の間に他の申込みが割り込まない。
+- 参加人数の集計は都度COUNTとし、非正規化カウンタ列は`Event`に持たない(カウンタとの不整合を避けるため。小規模コミュニティ向けで1イベントあたりの参加人数は多くないため、COUNTのコストは問題にならない)。
+- 重複申込みは、上記ロック内での存在チェックに加え、`event_id + user_id`のユニーク制約でも防ぐ。
+- 取消し(行の削除)は参加人数が減るだけで定員を超過しないため、ロックは取らない。
+- イベント編集で定員を変更する際も、同じイベント行をロックしてから参加人数をCOUNTし、定員が参加人数を下回らないことを確認してから保存する(定員の変更と申込みが同時に行われても、定員未満の参加人数に減ってしまわないようにするため)。
+- 同時実行制御のテスト(`tests/Concurrency`)は、SQLiteではなくPostgreSQL上で、別プロセスから同時に申込みを行って検証する(`phpunit.pgsql.xml`)。
 
 ## 関連ドキュメント
 

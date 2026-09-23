@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Event;
+use App\Models\EventParticipation;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -78,6 +79,48 @@ test('更新時も定員のバリデーションが行われる', function () {
         ->assertHasErrors(['form.capacity' => 'min']);
 
     expect($event->fresh()->capacity)->toBe(10);
+});
+
+test('定員を現在の参加人数未満には減らせない', function () {
+    $event = Event::factory()->create(['capacity' => 10]);
+    EventParticipation::factory()->count(3)->for($event)->create();
+    $this->actingAs($event->organizer);
+
+    Volt::test('pages.events.edit', ['event' => $event])
+        ->set('form.capacity', '2')
+        ->call('save')
+        ->assertHasErrors(['form.capacity'])
+        ->assertSee('定員は現在の参加人数(3人)未満にはできません。');
+
+    expect($event->fresh()->capacity)->toBe(10);
+});
+
+test('定員を現在の参加人数ちょうどまでは減らせる', function () {
+    $event = Event::factory()->create(['capacity' => 10]);
+    EventParticipation::factory()->count(3)->for($event)->create();
+    $this->actingAs($event->organizer);
+
+    Volt::test('pages.events.edit', ['event' => $event])
+        ->set('form.capacity', '3')
+        ->call('save')
+        ->assertHasNoErrors();
+
+    expect($event->fresh()->capacity)->toBe(3);
+});
+
+test('定員を減らせず更新に失敗した場合、新たにアップロードした画像は保存されない', function () {
+    $event = Event::factory()->create(['capacity' => 10]);
+    EventParticipation::factory()->count(3)->for($event)->create();
+    $this->actingAs($event->organizer);
+
+    Volt::test('pages.events.edit', ['event' => $event])
+        ->set('form.capacity', '1')
+        ->set('form.image', UploadedFile::fake()->image('new.png'))
+        ->call('save')
+        ->assertHasErrors(['form.capacity']);
+
+    expect(Storage::allFiles('events'))->toBe([])
+        ->and($event->fresh()->image_url)->toBeNull();
 });
 
 test('画像を差し替えると古い画像ファイルは削除される', function () {

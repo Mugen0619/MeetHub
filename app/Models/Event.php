@@ -2,14 +2,17 @@
 
 namespace App\Models;
 
+use App\Exceptions\ParticipationException;
 use Database\Factories\EventFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -74,6 +77,84 @@ class Event extends Model
     public function comments(): HasMany
     {
         return $this->hasMany(Comment::class);
+    }
+
+    /**
+     * イベントへの参加申込み一覧。
+     *
+     * @return HasMany<EventParticipation, $this>
+     */
+    public function participations(): HasMany
+    {
+        return $this->hasMany(EventParticipation::class);
+    }
+
+    /**
+     * イベントの参加者(申込み済みユーザー)一覧。
+     *
+     * @return BelongsToMany<User, $this>
+     */
+    public function participants(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'event_participations')
+            ->withPivot('created_at');
+    }
+
+    /**
+     * 指定したユーザーの参加申込みを登録する(要件定義書4.6節)。
+     *
+     * 定員残り1枠に同時に申込みが来ても定員を超過しないよう、トランザクション内で
+     * イベント行を悲観ロック(SELECT ... FOR UPDATE)してから参加人数をCOUNTし、定員と比較する。
+     * 同じイベントへの申込み・定員変更はこのロックで直列化されるため、COUNTと登録の間に割り込まれない。
+     *
+     * @throws ParticipationException 主催者本人・開催日時超過・重複申込み・定員到達の場合
+     */
+    public function join(User $user): EventParticipation
+    {
+        return DB::transaction(function () use ($user) {
+            $event = static::query()->lockForUpdate()->findOrFail($this->getKey());
+
+            if ($event->organizer_id === $user->id) {
+                throw ParticipationException::organizer();
+            }
+
+            if ($event->isEnded()) {
+                throw ParticipationException::ended();
+            }
+
+            if ($event->participations()->where('user_id', $user->id)->exists()) {
+                throw ParticipationException::alreadyJoined();
+            }
+
+            if ($event->participations()->count() >= $event->capacity) {
+                throw ParticipationException::full();
+            }
+
+            return $event->participations()->create(['user_id' => $user->id]);
+        });
+    }
+
+    /**
+     * 指定したユーザーの参加申込みを取り消す(行を削除する)。申込みしていない場合は何もしない。
+     * 参加人数が減るだけで定員を超過することはないため、ロックは取らない。
+     *
+     * @throws ParticipationException 開催日時を過ぎている場合
+     */
+    public function leave(User $user): void
+    {
+        if ($this->isEnded()) {
+            throw ParticipationException::cancelAfterStart();
+        }
+
+        $this->participations()->where('user_id', $user->id)->delete();
+    }
+
+    /**
+     * 指定したユーザーが参加申込み済みかどうか。
+     */
+    public function isJoinedBy(User $user): bool
+    {
+        return $this->participations()->where('user_id', $user->id)->exists();
     }
 
     /**

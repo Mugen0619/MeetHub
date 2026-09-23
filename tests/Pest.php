@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Foundation\Testing\DatabaseTruncation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -17,6 +18,12 @@ use Tests\TestCase;
 pest()->extend(TestCase::class)
     ->use(RefreshDatabase::class)
     ->in('Feature');
+
+// 同時実行制御のテストは、別プロセス(別のDB接続)からテストデータが見えるよう、
+// トランザクションで囲むRefreshDatabaseではなく、コミットしてテスト後にテーブルを空にするDatabaseTruncationを使う
+pest()->extend(TestCase::class)
+    ->use(DatabaseTruncation::class)
+    ->in('Concurrency');
 
 /*
 |--------------------------------------------------------------------------

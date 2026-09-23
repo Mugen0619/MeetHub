@@ -36,6 +36,9 @@ new class extends Component
                     <x-nav-link :href="route('events.index')" :active="request()->routeIs('events.index') || request()->routeIs('events.show')" wire:navigate>
                         イベント
                     </x-nav-link>
+                    <x-nav-link :href="route('events.participating')" :active="request()->routeIs('events.participating')" wire:navigate>
+                        参加予定
+                    </x-nav-link>
                     <x-nav-link :href="route('events.create')" :active="request()->routeIs('events.create')" wire:navigate>
                         イベント作成
                     </x-nav-link>
@@ -95,6 +98,9 @@ new class extends Component
             </x-responsive-nav-link>
             <x-responsive-nav-link :href="route('events.index')" :active="request()->routeIs('events.index') || request()->routeIs('events.show')" wire:navigate>
                 イベント
+            </x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('events.participating')" :active="request()->routeIs('events.participating')" wire:navigate>
+                参加予定
             </x-responsive-nav-link>
             <x-responsive-nav-link :href="route('events.create')" :active="request()->routeIs('events.create')" wire:navigate>
                 イベント作成
