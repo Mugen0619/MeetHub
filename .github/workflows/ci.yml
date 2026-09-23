@@ -82,4 +82,4 @@ jobs:
         env:
           # .envのDB_HOST(docker-composeのサービス名 pgsql)ではなく、CIのサービスコンテナに接続する
           DB_HOST: 127.0.0.1
-        run: php artisan test --configuration=phpunit.pgsql.xml
+        run: ./vendor/bin/pest --configuration=phpunit.pgsql.xml
