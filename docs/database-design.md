@@ -13,8 +13,9 @@
 | EventLike | id, event_id(FK), user_id(FK), created_at | 「興味あり」。event_id + user_idでユニーク制約 |
 | Comment | id, event_id(FK), user_id(FK), body, created_at | |
 | Follow | id, follower_id(FK→User), followee_id(FK→User), created_at | follower_id + followee_idでユニーク制約 |
-| EventParticipation | id, event_id(FK), user_id(FK), status(applied/cancelled), created_at, cancelled_at | 参加申込み(多対多の中間テーブル)。event_id + user_idでユニーク制約。現在の参加人数はstatus='applied'の行数をカウントする想定。取消し時に行を削除するかstatusを更新するかは実装フェーズで決定 |
-| RefreshToken | id, user_id(FK→User), token_hash, expires_at, created_at | 生トークンは保存せずSHA-256ハッシュのみ保存。使用時に削除し新トークンを再発行(ローテーション) |
+| EventParticipation | id, event_id(FK), user_id(FK), status(applied/cancelled), created_at, cancelled_at | 参加申込み(多対多の中間テーブル)。event_id + user_idでユニーク制約。現在の参加人数はstatus='applied'の行数をカウントする想定。取消し時に行を削除するかstatusを更新するかは実装フェーズで決定。※status更新方式(行を残す)を採る場合、ユニーク制約を`event_id + user_id`のままにすると取消し後の再申込みができなくなる(部分ユニークインデックス等の追加設計が必要になりうる。[要件定義書7節](./requirements.md#7-未決定事項tbd)参照) |
+
+※以前の案にあった`RefreshToken`エンティティは、JWTのリフレッシュトークン運用のために設けていたものだったが、今回はLaravel標準のセッション認証(`web`ガード)を採用しJWTを実装しないため削除した。将来、外部API・モバイルクライアント向けに`api`ガード+JWTを追加する際は、その時点で改めてリフレッシュトークンの保存要否・設計を検討する([tech-stack.md](./tech-stack.md#認証)を参照)。
 
 ## 参加申込み・定員管理まわりの設計メモ
 
