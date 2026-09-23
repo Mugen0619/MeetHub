@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -106,10 +107,29 @@ class Event extends Model
      * 定員残り1枠に同時に申込みが来ても定員を超過しないよう、トランザクション内で
      * イベント行を悲観ロック(SELECT ... FOR UPDATE)してから参加人数をCOUNTし、定員と比較する。
      * 同じイベントへの申込み・定員変更はこのロックで直列化されるため、COUNTと登録の間に割り込まれない。
+     * 申込みの成否と拒否理由はログに記録する(docs/observability.md)。
      *
      * @throws ParticipationException 主催者本人・開催日時超過・重複申込み・定員到達の場合
      */
     public function join(User $user): EventParticipation
+    {
+        try {
+            $participation = $this->joinWithLock($user);
+        } catch (ParticipationException $e) {
+            Log::warning('participation rejected', ['eventId' => $this->getKey(), 'reason' => $e->reason]);
+
+            throw $e;
+        }
+
+        Log::info('participation created', ['eventId' => $this->getKey()]);
+
+        return $participation;
+    }
+
+    /**
+     * @throws ParticipationException
+     */
+    private function joinWithLock(User $user): EventParticipation
     {
         return DB::transaction(function () use ($user) {
             $event = static::query()->lockForUpdate()->findOrFail($this->getKey());
@@ -143,10 +163,15 @@ class Event extends Model
     public function leave(User $user): void
     {
         if ($this->isEnded()) {
-            throw ParticipationException::cancelAfterStart();
+            $e = ParticipationException::cancelAfterStart();
+            Log::warning('participation cancel rejected', ['eventId' => $this->getKey(), 'reason' => $e->reason]);
+
+            throw $e;
         }
 
-        $this->participations()->where('user_id', $user->id)->delete();
+        if ($this->participations()->where('user_id', $user->id)->delete() > 0) {
+            Log::info('participation cancelled', ['eventId' => $this->getKey()]);
+        }
     }
 
     /**

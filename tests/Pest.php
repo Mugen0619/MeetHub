@@ -2,6 +2,8 @@
 
 use Illuminate\Foundation\Testing\DatabaseTruncation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 /*
@@ -54,4 +56,44 @@ expect()->extend('toBeOne', function () {
 function something()
 {
     // ..
+}
+
+/**
+ * 以降のログを、本番と同じJSONチャンネルで一時ファイルに出力するよう切り替え、そのファイルのパスを返す。
+ * ログチャンネルを作り直すため、ログコンテキストを使う操作(actingAs等)より前に呼ぶこと。
+ */
+function useJsonLogFile(): string
+{
+    $path = storage_path('logs/testing-'.Str::uuid().'.log');
+
+    config(['logging.default' => 'json', 'logging.channels.json.path' => $path]);
+    Log::forgetChannel('json');
+
+    return $path;
+}
+
+/**
+ * useJsonLogFile()で出力したログを1行ずつJSONとしてデコードして返す。
+ *
+ * @return list<array<string, mixed>>
+ */
+function readJsonLogs(string $path): array
+{
+    if (! file_exists($path)) {
+        return [];
+    }
+
+    $lines = file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [];
+
+    return array_map(fn (string $line) => json_decode($line, true, flags: JSON_THROW_ON_ERROR), $lines);
+}
+
+/**
+ * 指定したメッセージのログレコードを全て返す。
+ *
+ * @return list<array<string, mixed>>
+ */
+function findJsonLogs(string $path, string $message): array
+{
+    return array_values(array_filter(readJsonLogs($path), fn (array $record) => $record['message'] === $message));
 }

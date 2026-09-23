@@ -6,6 +6,8 @@
 - [技術スタック](./docs/tech-stack.md)
 - [画面設計](./docs/screen-design.md)
 - [データ設計](./docs/database-design.md)
+- [構造化ログ・ヘルスチェック](./docs/observability.md)
+- [運用ガイド(ログ調査・簡易インシデント対応)](./docs/operations-guide.md)
 
 ## 技術スタック(概要)
 

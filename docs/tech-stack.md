@@ -48,8 +48,8 @@ Livewireはサーバーサイドでレンダリングした画面をAjaxで部�
 
 | 技術 | バージョン | 備考 |
 |---|---|---|
-| Monolog | Laravel 13系に同梱のバージョンに準拠 | Laravel標準のログ機構。JSON構造化フォーマッタでログ出力し、traceId/userIdをログコンテキストとして付与する |
-| spatie/laravel-health | 1.40系 | ALBヘルスチェック用のエンドポイントを提供。prodプロファイルでは詳細情報を非公開にし、死活監視に必要な最小限の応答のみ返す |
+| Monolog | 3.12系(Laravel 13系に同梱) | Laravel標準のログ機構。JSON構造化フォーマッタ(`JsonFormatter`)でログ出力し、traceId/userIdをログコンテキストとして付与する。詳細は[observability.md](./observability.md)を参照 |
+| spatie/laravel-health | 1.40系 | ALBヘルスチェック用のエンドポイント(`/health`)を提供。死活監視に必要な最小限の応答(`{"healthy":true}`/503)のみ返し、チェックごとの詳細(`/health/details`)は`HEALTH_EXPOSE_DETAILS=true`の環境(ローカル開発)でのみ公開する |
 
 ## テスト
 
