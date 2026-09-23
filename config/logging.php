@@ -1,5 +1,6 @@
 <?php
 
+use Monolog\Formatter\JsonFormatter;
 use Monolog\Handler\NullHandler;
 use Monolog\Handler\StreamHandler;
 use Monolog\Handler\SyslogUdpHandler;
@@ -63,6 +64,19 @@ return [
             'path' => storage_path('logs/laravel.log'),
             'level' => env('LOG_LEVEL', 'debug'),
             'replace_placeholders' => true,
+        ],
+
+        // 構造化ログ(docs/observability.md)。1行1レコードのJSONで出力し、
+        // 例外発生時はスタックトレースも文字列としてJSONに含める
+        'json' => [
+            'driver' => 'single',
+            'path' => storage_path('logs/laravel.log'),
+            'level' => env('LOG_LEVEL', 'debug'),
+            'replace_placeholders' => true,
+            'formatter' => JsonFormatter::class,
+            'formatter_with' => [
+                'includeStacktraces' => true,
+            ],
         ],
 
         'daily' => [
