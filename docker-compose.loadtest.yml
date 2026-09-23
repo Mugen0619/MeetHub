@@ -1,0 +1,29 @@
+# k6負荷試験用の上書き設定(k6/README.md参照)。
+#   docker compose -f docker-compose.yml -f docker-compose.loadtest.yml up -d app
+#
+# 通常の開発用設定(docker-compose.yml)のままでは、以下の2点で負荷試験の結果がアプリ本来の性能を反映しないため、上書きする。
+#
+# 1. php artisan serve(PHPのビルトインサーバー)は既定では1プロセスでリクエストを1件ずつ処理するため、
+#    同時アクセスがサーバー側で直列化され、負荷試験・同時実行制御(参加申込みの悲観ロック)の検証にならない。
+#    → PHP_CLI_SERVER_WORKERSで複数のワーカープロセスを起動する(Laravelの仕様上、--no-reloadの指定が必要)。
+# 2. Windowsのファイルをバインドマウント(.:/var/www/html)している環境では、PHPのファイル読み込みが遅く、
+#    かつ並列に処理されないため、数十VUでスループットが頭打ちになる(実測で50VU時のp95が約1.4〜1.6秒。k6/README.md参照)。
+#    → 起動時にコード一式をコンテナ内部のファイルシステム(/tmp/app)へコピーし、そこから起動する。
+#      本番(ECS Fargate)もコードをコンテナイメージ内にコピーして動かすため、本番に近い条件になる。
+#
+# コピーしたコードで動くため、起動後のコード・.envの変更は反映されない。ログもコンテナ内部の
+# /tmp/app/storage/logs/laravel.log に出力される(docker compose exec app tail /tmp/app/storage/logs/laravel.log で確認する)。
+# 負荷試験が終わったら、通常の設定に戻すこと:
+#   docker compose up -d app
+services:
+  app:
+    environment:
+      PHP_CLI_SERVER_WORKERS: 8
+    command:
+      - sh
+      - -c
+      - >-
+        mkdir -p /tmp/app
+        && tar -C /var/www/html --exclude=./node_modules --exclude=./.git -cf - . | tar -C /tmp/app -xf -
+        && cd /tmp/app
+        && exec php artisan serve --host=0.0.0.0 --port=8000 --no-reload

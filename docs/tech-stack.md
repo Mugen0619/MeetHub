@@ -61,7 +61,7 @@ Livewireはサーバーサイドでレンダリングした画面をAjaxで部�
 | larastan/larastan(PHPStan) | 3.12系 | 静的解析。Eloquentモデル・リレーション等のLaravel固有の型推論に対応(Checkstyleに相当するLint) |
 | Laravel Pint | 1.27系以降 | コードスタイルの自動整形 |
 | laravel/pao | 1.0系 | 「Agent-optimized output for PHP testing tools」。PHPUnit/Pest/PHPStan/Rector等のCLI出力を、AIコーディングエージェント(Claude Code等)が読み取りやすい形式に整形する公式パッケージ。`laravel/laravel`スケルトンの標準devDependencyとして最初から含まれており、明示的に選定したものではない。テスト結果・挙動そのものには影響しない |
-| k6 | 継続(要件定義書[8節](./requirements.md#8-非機能要件)を参照) | 代表的なAPI(イベント一覧取得・参加申込み・ログイン)の負荷試験に使用。シナリオ記述にJavaScriptを用いるが、アプリ本体の実装言語(PHP)ではないため変更なく継続採用する。個人開発規模を想定しローカル実行のみを対象とする |
+| k6 | 2.2系(動作確認はv2.2.0) | 代表的な操作(イベント一覧取得・参加申込み・ログイン)の負荷試験に使用。シナリオ記述にJavaScriptを用いるが、アプリ本体の実装言語(PHP)ではないため変更なく継続採用する。個人開発規模を想定しローカル実行のみを対象とする。セッション認証 + Livewireの操作を再現する方法・実測結果は[k6/README.md](../k6/README.md)を参照 |
 
 ## データベース
 

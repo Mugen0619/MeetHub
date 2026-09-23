@@ -25,3 +25,6 @@ _ide_helper.php
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# k6負荷試験のHTMLレポート(実行のたびに生成される成果物)
+/k6/report/*.html
