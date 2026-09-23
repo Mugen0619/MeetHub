@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Livewire\Volt\Volt;
 
 Route::view('/', 'welcome');
 
@@ -11,5 +12,15 @@ Route::view('dashboard', 'dashboard')
 Route::view('profile', 'profile')
     ->middleware(['auth'])
     ->name('profile');
+
+Route::middleware(['auth'])->group(function () {
+    Volt::route('events', 'pages.events.index')
+        ->name('events.index');
+
+    // events/create 等の固定パスと衝突しないよう、IDは数値のみに制限する
+    Volt::route('events/{event}', 'pages.events.show')
+        ->whereNumber('event')
+        ->name('events.show');
+});
 
 require __DIR__.'/auth.php';
