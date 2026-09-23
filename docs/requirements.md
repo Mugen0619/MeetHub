@@ -4,7 +4,8 @@
 
 ```
 MeetHub/
-├─ app/                       # Laravelアプリケーション本体 (PHP + Blade + Livewire) ※実装フェーズで作成
+├─ app/, bootstrap/, config/, database/, public/, resources/, routes/, storage/, tests/
+│                             # Laravelアプリケーション本体(標準ディレクトリ構成)。artisan・composer.json・docker-compose.yml等もリポジトリ直下に配置 ※実装フェーズで作成
 ├─ infra/                     # インフラ構成 (AWS / Terraform 等) ※実装フェーズで作成
 ├─ docs/                      # 設計ドキュメント
 │  ├─ requirements.md         # 要件定義書(本書)
@@ -14,7 +15,7 @@ MeetHub/
 └─ README.md
 ```
 
-Livewireはサーバーサイドレンダリング + Ajax部分更新の仕組みのため、RAISETIMELINE(React SPA + Spring Boot API)のようなフロントエンド/バックエンドの物理的な分離は行わず、Laravelアプリケーション1つとして構成する(詳細は[tech-stack.md](./tech-stack.md)を参照)。
+Livewireはサーバーサイドレンダリング + Ajax部分更新の仕組みのため、RAISETIMELINE(React SPA + Spring Boot API)のようなフロントエンド/バックエンドの物理的な分離は行わない。また、Laravel自体が`app/`という標準ディレクトリを持つため、それと衝突しないよう「Laravelアプリケーション本体」を包む専用ディレクトリは設けず、Laravelプロジェクトをリポジトリ直下にそのまま配置する構成に変更した(詳細は[tech-stack.md](./tech-stack.md)を参照)。
 
 ## 1. 概要
 
