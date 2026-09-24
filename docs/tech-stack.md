@@ -14,8 +14,8 @@ Livewireはサーバーサイドでレンダリングした画面をAjaxで部�
 |---|---|---|
 | PHP | 8.5系 | Laravel 13.3以降はSymfony 8依存により実質PHP 8.4以上が必要になるため、最新安定版の8.5系を採用 |
 | Laravel | 13.33系 | PHP 8.3〜8.5をサポート(13.3以降は実質8.4以上)。RAISETIMELINEのSpring Bootに相当するバックエンドフレームワーク |
-| Livewire | 3.6系(`^3.6.4`) | Blade + PHPのみで動的なUIを実装するためのフレームワーク。JavaScriptをほぼ書かずに画面のインタラクティブ部分(参加申込みボタン・いいねトグル・コメント投稿等)を実装する。Livewire自体の最新安定版は4.4系(2026年9月時点)だが、Laravel Breeze 2.4.2のLivewireスタックインストーラーが`livewire/livewire:^3.6.4`を明示的に固定しているため、実際にインストールされるのは3.6系となる(本書の当初案は最新安定版の調査結果をそのまま転記した誤りで、実装時に判明したため訂正した)。Breezeが4系に対応次第、追従を検討する |
-| Livewire Volt | 1.7系(`^1.7.0`) | Livewireコンポーネントを単一のBladeファイル内に関数型記法で書けるようにする公式パッケージ。Breeze 2.4.2のLivewireスタックが標準採用しており、認証画面(ログイン・登録等)もVolt記法で生成される |
+| Livewire | 3.8系(`^3.6.4`。`composer.lock`で3.8.9) | Blade + PHPのみで動的なUIを実装するためのフレームワーク。JavaScriptをほぼ書かずに画面のインタラクティブ部分(参加申込みボタン・いいねトグル・コメント投稿等)を実装する。Livewire自体の最新安定版は4.4系(2026年9月時点)だが、Laravel Breeze 2.4.2のLivewireスタックインストーラーが`livewire/livewire:^3.6.4`を明示的に固定しているため、実際にインストールされるのは3系(制約`^3.6.4`の範囲の最新版。2026年9月時点で3.8系)となる(本書の当初案は最新安定版の調査結果をそのまま転記した誤りで、実装時に判明したため訂正した)。Breezeが4系に対応次第、追従を検討する |
+| Livewire Volt | 1.11系(`^1.7.0`。`composer.lock`で1.11.2) | Livewireコンポーネントを単一のBladeファイル内に関数型記法で書けるようにする公式パッケージ。Breeze 2.4.2のLivewireスタックが標準採用しており、認証画面(ログイン・登録等)もVolt記法で生成される |
 | Alpine.js | Livewireに同梱のバージョンに準拠(3.15系) | Livewireが内部で利用する軽量JSライブラリ。個別にバージョン管理・追加設定は行わない |
 | Laravel Breeze(Livewireスタック) | 2.4系(`^2.4`) | ログイン・ユーザー登録・プロフィール編集画面の認証スキャフォールディングに使用 |
 
@@ -89,4 +89,4 @@ Livewireはサーバーサイドでレンダリングした画面をAjaxで部�
 | 技術 | バージョン | 備考 |
 |---|---|---|
 | Composer | 2.10系 | PHPの依存関係管理。GitHub Actions上でキャッシュ対象とする |
-| GitHub Actions | - | push・PR時にPest(単体・統合・ブラウザE2E+アクセシビリティ検査)・Laravel Pint・Larastanを自動実行するCI(`.github/workflows/ci.yml`)に加え、本番デプロイを自動化するCDワークフローも整備する(具体的なパイプライン設計は実装フェーズのIssueで決定) |
+| GitHub Actions | - | push・PR時にPest(単体・統合・ブラウザE2E+アクセシビリティ検査)・Laravel Pint・Larastanを自動実行するCI(`.github/workflows/ci.yml`)と、CI成功後に本番(ECS Fargate)へ自動デプロイするCD(`.github/workflows/cd.yml`。AWSの認証はOIDC、`aws-actions/configure-aws-credentials` v4・`docker/build-push-action` v6)。設計は[infrastructure.md](./infrastructure.md#cd継続的デプロイ)を参照 |
