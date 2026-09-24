@@ -1,6 +1,7 @@
-# イベント画像の保存用S3バケット(docs/tech-stack.md「ストレージ / AWS連携」)。
+# 画像(イベント画像・ユーザーのアイコン)の保存用S3バケット(docs/tech-stack.md「ストレージ / AWS連携」)。
 #   - livewire-tmp/: ブラウザが署名付きURLで直接アップロードする一時ファイル(非公開。1日で自動削除)
-#   - events/      : 保存が確定した画像(一般公開。画面の<img>から直接読み込む)
+#   - events/      : 保存が確定したイベント画像(一般公開。画面の<img>から直接読み込む)
+#   - avatars/     : 保存が確定したユーザーのアイコン(一般公開。同上)
 # バケット名はグローバルに一意である必要があるため、ランダムなサフィックスを付与する
 resource "random_id" "images_bucket_suffix" {
   byte_length = 4
@@ -13,7 +14,7 @@ resource "aws_s3_bucket" "images" {
   tags = { Name = "${var.project_name}-images" }
 }
 
-# ACLによる公開は禁止しつつ、バケットポリシーによる公開(events/のみ)は許可する
+# ACLによる公開は禁止しつつ、バケットポリシーによる公開(events/・avatars/のみ)は許可する
 resource "aws_s3_bucket_public_access_block" "images" {
   bucket = aws_s3_bucket.images.id
 
@@ -25,10 +26,13 @@ resource "aws_s3_bucket_public_access_block" "images" {
 
 data "aws_iam_policy_document" "images_public_read" {
   statement {
-    sid       = "PublicReadEventImages"
-    effect    = "Allow"
-    actions   = ["s3:GetObject"]
-    resources = ["${aws_s3_bucket.images.arn}/events/*"]
+    sid     = "PublicReadImages"
+    effect  = "Allow"
+    actions = ["s3:GetObject"]
+    resources = [
+      "${aws_s3_bucket.images.arn}/events/*",
+      "${aws_s3_bucket.images.arn}/avatars/*",
+    ]
 
     principals {
       type        = "AWS"
