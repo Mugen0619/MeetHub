@@ -1,6 +1,33 @@
 # MeetHub
 
-勉強会・イベント掲示板アプリ。詳細な要件・設計は[docs/](./docs/)を参照。
+勉強会・イベント掲示板アプリ。主催者がイベント(勉強会・もくもく会等)を投稿し、参加希望者が「興味あり」・コメント・参加申込みを行い、主催者をフォローして新着イベントを追いかけられる。詳細な要件・設計は[docs/](./docs/)を参照。
+
+- 本番環境(AWS): https://d1tlmxx5mb206.cloudfront.net (課題の確認が終わったら削除する前提のため、URLは変わる・アクセスできなくなる場合がある)
+
+## 主な機能
+
+- アカウント: ユーザー登録・ログイン・ログアウト、プロフィールの表示・編集(表示名・メールアドレス・パスワード)
+- イベント: 作成・編集・削除(主催者本人のみ)、画像1枚の添付(本番はブラウザからS3へ直接アップロード)、開催日時を過ぎたイベントは「終了」扱い
+- イベント一覧(すべて / フォロー中の主催者)・詳細
+- 興味あり(いいね)・コメント
+- フォロー / フォロー解除、フォロー一覧・フォロワー一覧
+- 参加申込み・取消し、定員管理(同時申込みでも定員を超えないよう行ロックで排他制御)、マイ参加予定一覧、参加者一覧(主催者のみ閲覧可)
+
+## スクリーンショット
+
+ローカル環境にデモ用のデータを投入して撮影したもの。
+
+| イベント一覧 | イベント詳細(参加者の画面) |
+|---|---|
+| ![イベント一覧](./docs/images/event-list.png) | ![イベント詳細(参加者の画面)](./docs/images/event-detail.png) |
+| 開催日時が近い順に表示し、「フォロー中」で主催者を絞り込める | 参加申込み・取消し、興味あり、コメントの投稿・削除(投稿者本人のみ) |
+
+| イベント詳細(主催者の画面) | イベント作成 | プロフィール |
+|---|---|---|
+| ![イベント詳細(主催者の画面)](./docs/images/event-detail-organizer.png) | ![イベント作成](./docs/images/event-create.png) | ![プロフィール](./docs/images/profile.png) |
+| 定員に達したイベント。参加者一覧は主催者のみ閲覧できる | タイトル・開催日時・場所・説明・定員・画像を入力する | 自己紹介・フォロー数・主催イベント。フォロー / フォロー解除 |
+
+## ドキュメント
 
 - [要件定義書](./docs/requirements.md)
 - [技術スタック](./docs/tech-stack.md)
@@ -13,7 +40,7 @@
 
 ## 技術スタック(概要)
 
-PHP 8.5 + Laravel 13 + Livewire 3.6(Volt) + Blade + Tailwind CSS + PostgreSQL 17。詳細は[tech-stack.md](./docs/tech-stack.md)を参照。
+PHP 8.5 + Laravel 13 + Livewire 3.8(Volt 1.11) + Blade + Tailwind CSS 3.4 + PostgreSQL 17。本番環境はAWS(CloudFront + ALB + ECS Fargate + RDS + S3)で、Terraform 1.15で構築している。詳細は[tech-stack.md](./docs/tech-stack.md)・[infrastructure.md](./docs/infrastructure.md)を参照。
 
 ## ローカル開発環境
 
@@ -120,6 +147,9 @@ docker compose run --rm app ./vendor/bin/pint
 docker compose run --rm app ./vendor/bin/phpstan analyse
 ```
 
-## CI
+## CI/CD
 
-GitHub Actions(`.github/workflows/ci.yml`)で、push・PR時にLaravel Pint・Larastan・Pestのテスト(SQLite・PostgreSQLの両方)と、E2Eテスト(ユーザージャーニー・アクセシビリティ検査。PostgreSQLのサービスコンテナを使用)を自動実行する。E2Eテストが失敗した場合は、スクリーンショットをアーティファクト(`e2e-screenshots`)として保存する。k6による負荷試験は、CIの実行環境の性能が変動するためCIでは実行しない([k6/README.md](./k6/README.md))。
+GitHub Actionsで、テストと本番へのデプロイを自動化している。
+
+- **CI**(`.github/workflows/ci.yml`): push・PR時にLaravel Pint・Larastan・Pestのテスト(SQLite・PostgreSQLの両方)と、E2Eテスト(ユーザージャーニー・アクセシビリティ検査。PostgreSQLのサービスコンテナを使用)を自動実行する。E2Eテストが失敗した場合は、スクリーンショットをアーティファクト(`e2e-screenshots`)として保存する。k6による負荷試験は、CIの実行環境の性能が変動するためCIでは実行しない([k6/README.md](./k6/README.md))
+- **CD**(`.github/workflows/cd.yml`): mainへのpushで動いたCIが成功すると、本番用のDockerイメージをビルドしてECRへpushし、ECS Fargateのサービスを新しいタスク定義のリビジョンに更新する。AWSの認証はOIDC(長期間有効なアクセスキーを使わない)。設計は[infrastructure.md](./docs/infrastructure.md#cd継続的デプロイ)、ロールバック等の手順は[infra/production/README.md](./infra/production/README.md#デプロイ)を参照
