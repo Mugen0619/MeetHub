@@ -1,0 +1,117 @@
+name: CD
+
+# mainへのpushで動いたCIが成功したら、本番環境(ECS Fargate)へデプロイする。
+# 手順・ロールバックは infra/production/README.md「デプロイ」を参照
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+
+# デプロイは途中で打ち切らず、後から来たものは順番待ちにする
+concurrency:
+  group: cd-production
+  cancel-in-progress: false
+
+permissions:
+  id-token: write # OIDCでIAMロールを引き受けるため
+  contents: read
+
+jobs:
+  deploy:
+    # CIが成功し、かつmainへのpushで動いたCIの場合のみ(フォークのmainブランチからのPR等では動かさない)
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
+    # environmentは指定しない(指定するとOIDCトークンのsubが「environment:〜」になり、IAMロールの信頼ポリシー(ref:refs/heads/main)と一致しなくなる)
+    runs-on: ubuntu-latest
+
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      ECR_REPOSITORY_URL: ${{ vars.ECR_REPOSITORY_URL }}
+      ECS_CLUSTER: ${{ vars.ECS_CLUSTER }}
+      ECS_SERVICE: ${{ vars.ECS_SERVICE }}
+      ECS_TASK_DEFINITION_FAMILY: ${{ vars.ECS_TASK_DEFINITION_FAMILY }}
+      ECS_CONTAINER_NAME: ${{ vars.ECS_CONTAINER_NAME }}
+      # CIで検証したコミット(workflow_runではgithub.shaが「実行時点のmainの先頭」になり、CIが検証したものと異なりうるため)
+      COMMIT_SHA: ${{ github.event.workflow_run.head_sha }}
+
+    steps:
+      - name: Checkout (CIで検証したコミット)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.COMMIT_SHA }}
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # ECRはタグの上書き不可(IMMUTABLE)のため、同じコミットの再実行時はビルド・pushを省略する
+      - name: Check if image already exists
+        id: image
+        run: |
+          IMAGE_TAG="${COMMIT_SHA:0:12}"
+          echo "tag=$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+          echo "uri=$ECR_REPOSITORY_URL:$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+          if aws ecr describe-images --repository-name "${ECR_REPOSITORY_URL#*/}" --image-ids imageTag="$IMAGE_TAG" > /dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "イメージ $IMAGE_TAG はpush済みのため、ビルドを省略します"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Docker Buildx
+        if: steps.image.outputs.exists == 'false'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push image
+        if: steps.image.outputs.exists == 'false'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/production/Dockerfile
+          platforms: linux/amd64
+          push: true
+          provenance: false
+          tags: ${{ steps.image.outputs.uri }}
+          # レイヤーのキャッシュ(composer・npmの依存関係のインストール等)をGitHub Actionsのキャッシュに保存する
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # 最新のタスク定義(環境変数等はTerraformで管理)をもとに、イメージだけ差し替えた新しいリビジョンを登録する
+      - name: Register new task definition revision
+        id: taskdef
+        run: |
+          aws ecs describe-task-definition --task-definition "$ECS_TASK_DEFINITION_FAMILY" \
+            --query taskDefinition --output json > current.json
+
+          jq --arg name "$ECS_CONTAINER_NAME" --arg image "${{ steps.image.outputs.uri }}" '
+            .containerDefinitions |= map(if .name == $name then .image = $image else . end)
+            | del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)
+          ' current.json > new.json
+
+          ARN=$(aws ecs register-task-definition --cli-input-json file://new.json \
+            --query taskDefinition.taskDefinitionArn --output text)
+          echo "arn=$ARN" >> "$GITHUB_OUTPUT"
+          echo "登録したタスク定義: $ARN"
+
+      - name: Update ECS service
+        run: |
+          aws ecs update-service --cluster "$ECS_CLUSTER" --service "$ECS_SERVICE" \
+            --task-definition "${{ steps.taskdef.outputs.arn }}" \
+            --query 'service.deployments[0].{id:id,status:status,taskDefinition:taskDefinition}' --output table
+
+      # 新しいタスクがヘルスチェックに通らない場合は、サーキットブレーカーが直前のリビジョンに戻す(その場合はこのステップが失敗する)
+      - name: Wait for service stability
+        run: |
+          aws ecs wait services-stable --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE"
+          CURRENT=$(aws ecs describe-services --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE" \
+            --query 'services[0].taskDefinition' --output text)
+          echo "稼働中のタスク定義: $CURRENT"
+          if [ "$CURRENT" != "${{ steps.taskdef.outputs.arn }}" ]; then
+            echo "::error::デプロイしたリビジョンではなく $CURRENT で稼働しています(サーキットブレーカーによるロールバック)"
+            exit 1
+          fi

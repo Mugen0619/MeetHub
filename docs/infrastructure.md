@@ -9,8 +9,8 @@
 ## 対象外
 
 - 独自ドメインの取得・カスタムドメインでのHTTPS化(CloudFrontのデフォルトドメイン `xxxx.cloudfront.net` とその証明書を使う)
-- CDパイプライン(GitHub Actionsによる自動デプロイ。別Issueで構築する)
-- CI上でのTerraformの自動実行
+- CI上でのTerraformの自動実行(Terraformの変更は手元でplanをレビューしてからapplyする。CDが自動で行うのはアプリのデプロイのみ)
+- Blue/Green等の高度なデプロイ戦略(ECSのローリングアップデート + サーキットブレーカーによる自動ロールバックのみ)
 - 外部監視ツール・アラートの設定
 
 ## 全体構成
@@ -50,6 +50,7 @@ ECS Fargate タスク(プライベートサブネット)
 | S3(画像) | `events/*`のみ一般公開(バケットポリシー。ACLは無効)、`livewire-tmp/`は非公開で1日後に自動削除。CORSはCloudFrontのURLからのPUTのみ許可 | `s3.tf` |
 | Secrets Manager | `APP_KEY`(Terraformが生成した32バイトの乱数)、DBパスワード | `secrets.tf` |
 | IAM | タスク実行ロール(ECR・CloudWatch Logs・Secrets Manager)、タスクロール(画像バケットへのPut/Get/Delete/List、ECS Exec) | `iam.tf` |
+| IAM(CD) | GitHub ActionsのOIDCプロバイダ、デプロイ用ロール(`meethub-github-actions-deploy`。ECRへのpush・タスク定義の登録・サービスの更新のみ) | `github_oidc.tf` |
 | CloudWatch Logs | `/ecs/meethub-app`、14日保持 | `ecs.tf` |
 
 ## セキュリティの設計
@@ -93,8 +94,8 @@ ALBはインターネットに公開されているが、CloudFront以外から�
 | `assets` | `node:22-slim`でVite/Tailwind CSSのアセットをビルド(TailwindはLaravelのページネーションのビュー(vendor配下)もクラス名の抽出対象にするため、そのビューだけを`vendor`ステージからコピーする) |
 | `runtime` | `php-base`にNginxを追加し、アプリのコード・vendor・ビルド済みアセットだけをコピー(Node.js・Composerは含めない) |
 
-- **1コンテナでNginx + PHP-FPMを動かす**: 起動スクリプト([docker/production/entrypoint.sh](../docker/production/entrypoint.sh))が両方を起動し、どちらかが終了したらコンテナごと終了する(ECSが新しいタスクに入れ替える)。Nginxを別コンテナ(サイドカー)にする構成と比べ、イメージが1つで済みデプロイ(今後のCD)が単純になるため、この構成にした
-- **起動時の処理**: 実行時の環境変数をもとに`php artisan optimize`(設定・ルート・ビュー・イベントのキャッシュ)を行い、`RUN_MIGRATIONS=true`の場合はマイグレーションを実行する。タスクが1つの間はこの方式とし、複数タスクを同時に起動する構成にする場合は、同時実行を避けるためデプロイ時に1回だけ実行する方式(ECSのワンオフタスク等)に切り替える(CDのIssueで検討する)
+- **1コンテナでNginx + PHP-FPMを動かす**: 起動スクリプト([docker/production/entrypoint.sh](../docker/production/entrypoint.sh))が両方を起動し、どちらかが終了したらコンテナごと終了する(ECSが新しいタスクに入れ替える)。Nginxを別コンテナ(サイドカー)にする構成と比べ、イメージが1つで済みデプロイ(CD)が単純になるため、この構成にした
+- **起動時の処理**: 実行時の環境変数をもとに`php artisan optimize`(設定・ルート・ビュー・イベントのキャッシュ)を行い、`RUN_MIGRATIONS=true`の場合はマイグレーションを実行する。タスクが1つの間はこの方式とし、複数タスクを同時に起動する構成にする場合は、同時実行を避けるためデプロイ時に1回だけ実行する方式(ECSのワンオフタスク等)に切り替える(タスク数1の間は現状のままとする。[CD](#cd継続的デプロイ)参照)
 - **停止**: ECSのタスク停止(SIGTERM)を受けて、Nginx・PHP-FPMに処理中のリクエストを終えてから終了させる。ベースの`php:fpm`イメージは停止シグナルがSIGQUITのため、`STOPSIGNAL SIGTERM`で明示している
 - **PHPの設定**: OPcacheはファイルの更新確認を無効化(コードはイメージ内で変わらないため)。PHP-FPMのアクセスログは出さず(Laravelがアクセスログを構造化して出すため)、ワーカーのJSONログが途中で分割されないよう1行の上限(`log_limit`)を引き上げている
 
@@ -128,6 +129,40 @@ ECSタスク定義で設定する(`infra/production/ecs.tf`の`app_environment`)
 | `PHP_FPM_MAX_CHILDREN` | `4` | |
 | `RUN_MIGRATIONS` | `true` | コンテナ起動時にマイグレーションを実行する |
 | `HEALTH_EXPOSE_DETAILS` | (設定しない) | `/health/details`は404になる |
+
+## CD(継続的デプロイ)
+
+mainへのマージ(push)で動いたCIが成功すると、GitHub Actionsの[CDワークフロー](../.github/workflows/cd.yml)が本番へ自動でデプロイする。手順の詳細・手動でのロールバックは[infra/production/README.md](../infra/production/README.md#デプロイ)を参照。
+
+```
+mainへpush ─▶ CI(テスト・Lint・E2E)─成功─▶ CD(workflow_run)
+                                               │ ① OIDCでデプロイ用ロールを引き受ける
+                                               │ ② 本番用イメージをビルドし、ECRへpush(タグ: コミットハッシュ先頭12桁)
+                                               │ ③ 最新のタスク定義のイメージだけ差し替えて、新しいリビジョンを登録
+                                               │ ④ ECSサービスを新しいリビジョンに更新(ローリングアップデート)
+                                               ▼ ⑤ サービスが安定するまで待つ(失敗時はサーキットブレーカーが直前のリビジョンに戻す)
+```
+
+MeetHubはLivewireで画面も1つのLaravelアプリが担い、フロントエンドのビルド成果物(Vite)もDockerイメージに含まれる。そのため、RAISETIMELINEのような「フロントエンドのS3同期・CloudFrontのキャッシュ無効化」は不要で、イメージのビルド・push・ECSサービスの更新の1系統で完結する(`/build/*`はファイル名にハッシュを含むため、CloudFrontのキャッシュを無効化しなくても新しいファイルが参照される)。
+
+設計上の判断:
+
+- **認証はOIDC**: 長期間有効なアクセスキーをGitHub Secretsに置かず、GitHub ActionsのOIDCトークンでIAMロールを引き受ける(1時間で失効する一時的な認証情報)。ロールの信頼ポリシーは`repo:Mugen0619/MeetHub:ref:refs/heads/main`に限定し、PRのブランチや他のリポジトリからは引き受けられない。権限はECRの`meethub-app`へのpush、タスク定義の取得・登録、`meethub-app`サービスの更新・参照、タスク実行ロール・タスクロールのPassRole(ECSタスクに渡す場合のみ)に絞っている
+- **CIで検証したコミットをデプロイする**: `workflow_run`では`github.sha`が「CD開始時点のmainの先頭」になり、CIが検証したコミットと異なりうるため、`github.event.workflow_run.head_sha`をチェックアウト・タグ付けに使う。mainへの`push`で動いたCIの場合のみ実行する(フォークの`main`ブランチからのPRで動いたCIでは動かさない)
+- **タグはコミットハッシュ(上書き不可)**: ECRはタグの上書きを禁止しているため、`latest`の上書きではなく、デプロイのたびに一意なタグでpushし、タスク定義の新しいリビジョンを登録する。同じコミットの再実行時は、push済みのイメージを使う
+- **Terraformとの管理の分担**: Terraformはタスク定義の「ベース」(環境変数・秘密情報・CPU/メモリ・ロール等)を管理し、CDはイメージの差し替えとサービスが使うリビジョンの切り替えを担う。ECSサービスの`task_definition`はTerraformの差分対象から外している(`lifecycle.ignore_changes`)。外さないと、インフラ変更のたびの`terraform apply`で、Terraformが登録したリビジョン(古いイメージ)に戻ってしまう。環境変数等をTerraformで変更した場合は、次のCDで(最新リビジョンをもとにするため)反映される
+- **デプロイを途中で打ち切らない**: `concurrency`で同時に1つだけ実行し、後から来たものは順番待ちにする(CIと異なり`cancel-in-progress`は無効)
+- **ビルドのキャッシュ**: Dockerのレイヤー(Composer・npmの依存関係のインストール等)をGitHub Actionsのキャッシュに保存し、2回目以降のビルドを短縮する
+
+GitHubのリポジトリ変数(`Settings > Secrets and variables > Actions > Variables`)に、ワークフローで使う値を登録している。秘密情報ではないためSecretsではなくVariablesとした。
+
+| 変数 | 値 |
+|---|---|
+| `AWS_REGION` | `ap-northeast-1` |
+| `AWS_DEPLOY_ROLE_ARN` | デプロイ用ロールのARN(`terraform output github_actions_deploy_role_arn`) |
+| `ECR_REPOSITORY_URL` | `terraform output ecr_repository_url` |
+| `ECS_CLUSTER` / `ECS_SERVICE` | `meethub-cluster` / `meethub-app` |
+| `ECS_TASK_DEFINITION_FAMILY` / `ECS_CONTAINER_NAME` | `meethub-app` / `app` |
 
 ## ヘルスチェック
 
@@ -175,5 +210,5 @@ ALBのヘルスチェックは`GET /health`(30秒間隔、2回連続で成功し
 
 ## 今後の課題
 
-- **CD(自動デプロイ)**: GitHub ActionsからイメージのビルドとECRへのpush、ECSサービスの更新を行う(別Issue)。あわせて、マイグレーションの実行方式(起動時 → デプロイ時に1回)と、Terraformとデプロイで更新するタスク定義の管理の分担を決める
+- **マイグレーションの実行方式**: タスクを複数に増やす場合は、コンテナ起動時の実行から、CDの中でデプロイ時に1回だけ実行する方式(ECSのワンオフタスク等)に切り替える
 - **Terraformのstateの管理**: 現在はローカルファイル。CDやチームでの運用を行う場合は、S3バックエンド(+ロック)に移行する

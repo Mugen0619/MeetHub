@@ -38,3 +38,8 @@ output "rds_endpoint" {
 output "images_bucket_name" {
   value = aws_s3_bucket.images.bucket
 }
+
+output "github_actions_deploy_role_arn" {
+  description = "CD(GitHub Actions)がOIDCで引き受けるIAMロール。GitHubのリポジトリ変数 AWS_DEPLOY_ROLE_ARN に設定する"
+  value       = aws_iam_role.github_actions_deploy.arn
+}

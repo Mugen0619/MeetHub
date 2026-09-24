@@ -29,6 +29,7 @@ MeetHubの本番環境(AWS)のTerraform構成と、構築・デプロイの手�
 | `rds.tf` | RDS(PostgreSQL 17)・DBサブネットグループ・DBパスワードの生成 |
 | `secrets.tf` | Secrets Manager(APP_KEY・DBパスワード) |
 | `iam.tf` | タスク実行ロール・タスクロール(S3・ECS Exec) |
+| `github_oidc.tf` | CD(GitHub Actions)用のOIDCプロバイダ・デプロイ用ロール |
 | `s3.tf` | イベント画像のバケット(公開範囲・CORS・一時ファイルの自動削除) |
 | `cloudfront.tf` | CloudFront(オリジンはALB) |
 | `outputs.tf` | 本番URL・ECRのURL・クラスター名等 |
@@ -55,7 +56,7 @@ terraform -chdir=infra/production apply -var app_image_tag=$TAG \
 
 ### 3. イメージをビルドしてECRへpushする
 
-[デプロイ手順](#デプロイ新しいバージョンを反映する)の1〜2と同じ。
+[手動デプロイ](#手動デプロイcdが使えない場合)の1〜2と同じ。
 
 ### 4. 残りを作成する
 
@@ -72,9 +73,62 @@ terraform -chdir=infra/production output app_url
 
 ECSのタスクは起動時にマイグレーションを実行する(`RUN_MIGRATIONS=true`)。起動状況は[ログの確認](#ログの確認)で確認できる。
 
-## デプロイ(新しいバージョンを反映する)
+### 5. CDで使う値をGitHubのリポジトリ変数に登録する
 
-CDパイプライン(GitHub Actions)は別Issueで構築する。それまでは以下の手順で手動デプロイする。
+[CD(自動デプロイ)](#cd自動デプロイ)の`gh variable set`を実行する。以降のデプロイはmainへのマージで自動的に行われる。
+
+## デプロイ
+
+### CD(自動デプロイ)
+
+mainへのマージ後、CIが成功すると[CDワークフロー](../../.github/workflows/cd.yml)が自動で本番へデプロイする(設計の判断は[docs/infrastructure.md](../../docs/infrastructure.md#cd継続的デプロイ)を参照)。
+
+1. GitHub ActionsのOIDCで、デプロイ用ロール(`meethub-github-actions-deploy`)を引き受ける
+2. CIで検証したコミットから本番用イメージをビルドし、コミットハッシュ(先頭12桁)をタグにしてECRへpushする(push済みなら省略)
+3. タスク定義`meethub-app`の最新リビジョンを取得し、イメージだけ差し替えた新しいリビジョンを登録する
+4. ECSサービスを新しいリビジョンに更新し、`aws ecs wait services-stable`で安定するまで待つ
+5. 稼働中のリビジョンがデプロイしたものと一致することを確認する(サーキットブレーカーでロールバックされた場合はジョブが失敗する)
+
+ワークフローが使う値は、GitHubのリポジトリ変数に登録している(Terraformで作り直した場合は再登録する)。
+
+```bash
+TF="terraform -chdir=infra/production output -raw"
+gh variable set AWS_REGION --body ap-northeast-1
+gh variable set AWS_DEPLOY_ROLE_ARN --body "$($TF github_actions_deploy_role_arn)"
+gh variable set ECR_REPOSITORY_URL --body "$($TF ecr_repository_url)"
+gh variable set ECS_CLUSTER --body "$($TF ecs_cluster_name)"
+gh variable set ECS_SERVICE --body "$($TF ecs_service_name)"
+gh variable set ECS_TASK_DEFINITION_FAMILY --body meethub-app
+gh variable set ECS_CONTAINER_NAME --body app
+```
+
+実行状況は`gh run list --workflow CD`、ログは`gh run view <run-id> --log`で確認できる。失敗したデプロイを同じコミットでやり直す場合は、GitHubのActions画面(または`gh run rerun <run-id>`)で再実行する。
+
+### Terraformとの分担
+
+ECSサービスが使うタスク定義のリビジョンはCDが切り替えるため、Terraformの差分対象から外している(`ecs.tf`の`lifecycle.ignore_changes`)。Terraformで環境変数等を変更して`apply`すると、タスク定義の新しいリビジョンが登録されるが、サービスには反映されない。**次のCD(または下記の手動デプロイ)で、最新リビジョンをもとにしたイメージの差し替えとして反映される。**
+
+`terraform plan`/`apply`時の`-var app_image_tag`には、Terraformが管理するタスク定義のタグ(stateに記録されている値。`terraform state show aws_ecs_task_definition.app`で確認できる)をそのまま指定する。別のタグを指定すると、Terraform側のタスク定義が作り直される(サービスには影響しない)。
+
+### ロールバック
+
+新しいタスクがヘルスチェックに通らない場合は、デプロイのサーキットブレーカーが直前のタスク定義に自動で戻す。
+
+ヘルスチェックには通るが不具合がある場合は、1つ前のタスク定義のリビジョンを指定してサービスを更新する(イメージはECRに直近10世代残っている)。
+
+```bash
+# 登録済みのリビジョンとイメージを確認する(新しい順)
+aws ecs list-task-definitions --family-prefix meethub-app --sort DESC --max-items 5 --region ap-northeast-1
+aws ecs describe-task-definition --task-definition meethub-app:<リビジョン>   --query 'taskDefinition.containerDefinitions[0].image' --output text --region ap-northeast-1
+
+# 1つ前のリビジョンに戻す
+aws ecs update-service --cluster meethub-cluster --service meethub-app   --task-definition meethub-app:<1つ前のリビジョン> --region ap-northeast-1
+aws ecs wait services-stable --cluster meethub-cluster --services meethub-app --region ap-northeast-1
+```
+
+ロールバックはサービスが使うリビジョンを戻すだけで、mainのコードは戻らない。不具合の修正(またはrevert)をmainにマージすると、CDで改めてデプロイされる。マイグレーションは自動では巻き戻らないため、スキーマ変更を含むデプロイを戻す場合は、古いコードで新しいスキーマが動くかを確認する。
+
+### 手動デプロイ(CDが使えない場合)
 
 1. ECRにログインする
 
@@ -92,15 +146,16 @@ CDパイプライン(GitHub Actions)は別Issueで構築する。それまでは
    docker push "$REPO:$TAG"
    ```
 
-3. タスク定義のイメージタグを更新する(ECSサービスが新しいタスクを起動し、ヘルスチェックに通ったら古いタスクを停止する)
+3. CDと同じ手順で、イメージを差し替えたタスク定義のリビジョンを登録し、サービスを更新する(`jq`が必要)
 
    ```bash
-   terraform -chdir=infra/production plan -var app_image_tag=$TAG -out=tfplan
-   terraform -chdir=infra/production apply tfplan
+   aws ecs describe-task-definition --task-definition meethub-app --query taskDefinition --output json --region ap-northeast-1      | jq --arg image "$REPO:$TAG" '.containerDefinitions[0].image = $image
+         | del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)' > taskdef.json
+   ARN=$(aws ecs register-task-definition --cli-input-json file://taskdef.json      --query taskDefinition.taskDefinitionArn --output text --region ap-northeast-1)
+   aws ecs update-service --cluster meethub-cluster --service meethub-app --task-definition "$ARN" --region ap-northeast-1
    aws ecs wait services-stable --cluster meethub-cluster --services meethub-app --region ap-northeast-1
+   rm taskdef.json
    ```
-
-新しいタスクがヘルスチェックに通らない場合は、デプロイのサーキットブレーカーが直前のタスク定義に自動で戻す。
 
 ## 動作確認
 

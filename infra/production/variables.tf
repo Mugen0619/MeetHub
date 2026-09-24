@@ -75,6 +75,14 @@ variable "ecs_desired_count" {
 }
 
 variable "app_image_tag" {
-  description = "ECSタスク定義に設定するアプリのイメージタグ(Gitのコミットハッシュ)。ECRへpushしてからapplyする"
+  description = "Terraformが登録するタスク定義のイメージタグ(Gitのコミットハッシュ)。初回構築時のみ使い、以降のデプロイはCDが行う"
   type        = string
+}
+
+# --- CD(GitHub Actions) ---
+
+variable "github_repository" {
+  description = "CDのワークフローを実行するGitHubリポジトリ(owner/repo)。このリポジトリのmainブランチのみデプロイ用ロールを引き受けられる"
+  type        = string
+  default     = "Mugen0619/MeetHub"
 }
