@@ -34,6 +34,8 @@ new #[Layout('layouts.guest')] class extends Component
 }; ?>
 
 <div>
+    <x-slot name="heading">パスワードの確認</x-slot>
+
     <div class="mb-4 text-sm text-gray-600">
         {{ __('This is a secure area of the application. Please confirm your password before continuing.') }}
     </div>

@@ -39,6 +39,8 @@ new #[Layout('layouts.guest')] class extends Component
 }; ?>
 
 <div>
+    <x-slot name="heading">新規登録</x-slot>
+
     <form wire:submit="register">
         <!-- Username -->
         <div>

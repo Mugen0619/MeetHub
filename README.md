@@ -88,6 +88,27 @@ docker compose exec pgsql psql -U meethub -d meethub -c "create database meethub
 docker compose run --rm app ./vendor/bin/pest --configuration=phpunit.pgsql.xml
 ```
 
+### E2Eテストの実行(Pestのブラウザテスト)
+
+代表的なユーザージャーニーと主要画面のアクセシビリティ検査を、Pestのブラウザテスト機能(`pestphp/pest-plugin-browser`、内部でPlaywrightのChromiumを使用)で実行する。テストは`tests/Browser`にあり、PostgreSQL上で実行するため`phpunit.pgsql.xml`の`Browser`テストスイートとして実行する。
+
+| ファイル | 内容 |
+|---|---|
+| `tests/Browser/UserJourneyTest.php` | 主催者(新規登録→イベント作成→編集→削除)、参加者(新規登録→詳細→いいね→コメント→参加申込み→参加予定一覧→取消し)、フォロー(ログイン→フォロー→「フォロー中」タブ→フォロー解除)の3本 |
+| `tests/Browser/AccessibilityTest.php` | ログイン・登録・イベント一覧・イベント詳細(参加者/主催者)・プロフィール画面をaxe-core(デフォルトルールセット、影響度minorまで全て)で検査する。違反が見つかった場合は、テストではなく画面(Blade・Livewireコンポーネント)を修正する |
+
+```bash
+# 画面のアセット(CSS/JS)がビルドされている必要がある(未ビルドの場合)
+docker compose run --rm app npm run build
+
+docker compose run --rm app ./vendor/bin/pest --configuration=phpunit.pgsql.xml --testsuite=Browser
+```
+
+- ブラウザ(Chromium)とその実行に必要なライブラリはDockerイメージに含めている(`Dockerfile`)。`package.json`のplaywrightのバージョンを上げた場合は、`Dockerfile`のバージョンも揃えてイメージを作り直す(`docker compose build app`)
+- アプリは別途起動しておく必要はない(Pestがテストと同じプロセス内でHTTPサーバーを起動し、テストと同じDB接続を使う)
+- 失敗した場合、失敗時点の画面のスクリーンショットが`tests/Browser/Screenshots/`に保存される(Git管理対象外)
+- `phpunit.pgsql.xml`で`--testsuite`を指定せずに実行すると、E2Eテストも含めた全テストが実行される
+
 ### コード品質チェック
 
 ```bash
@@ -100,4 +121,4 @@ docker compose run --rm app ./vendor/bin/phpstan analyse
 
 ## CI
 
-GitHub Actions(`.github/workflows/ci.yml`)で、push・PR時にLaravel Pint・Larastan・Pestのテスト(SQLite・PostgreSQLの両方)を自動実行する。
+GitHub Actions(`.github/workflows/ci.yml`)で、push・PR時にLaravel Pint・Larastan・Pestのテスト(SQLite・PostgreSQLの両方)と、E2Eテスト(ユーザージャーニー・アクセシビリティ検査。PostgreSQLのサービスコンテナを使用)を自動実行する。E2Eテストが失敗した場合は、スクリーンショットをアーティファクト(`e2e-screenshots`)として保存する。k6による負荷試験は、CIの実行環境の性能が変動するためCIでは実行しない([k6/README.md](./k6/README.md))。

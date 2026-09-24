@@ -37,7 +37,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: "8.5"
-          extensions: mbstring, bcmath, gd, zip, intl, pdo, pdo_pgsql
+          extensions: mbstring, bcmath, gd, zip, intl, pdo, pdo_pgsql, sockets
           coverage: none
           tools: composer:v2
 
@@ -59,6 +59,10 @@ jobs:
 
       - name: Install Node dependencies
         run: npm ci
+
+      # E2Eテスト(Pestのブラウザテスト)用。Playwrightのバージョンはpackage-lock.jsonのものを使う
+      - name: Install Playwright browser (Chromium)
+        run: npx playwright install --with-deps chromium
 
       - name: Build frontend assets
         run: npm run build
@@ -82,4 +86,18 @@ jobs:
         env:
           # .envのDB_HOST(docker-composeのサービス名 pgsql)ではなく、CIのサービスコンテナに接続する
           DB_HOST: 127.0.0.1
-        run: ./vendor/bin/pest --configuration=phpunit.pgsql.xml
+        run: ./vendor/bin/pest --configuration=phpunit.pgsql.xml --testsuite=Unit,Feature,Concurrency
+
+      - name: Run E2E tests (Pest browser tests, user journeys and accessibility)
+        env:
+          DB_HOST: 127.0.0.1
+        run: ./vendor/bin/pest --configuration=phpunit.pgsql.xml --testsuite=Browser
+
+      # E2Eテストが失敗した場合、失敗時点の画面のスクリーンショットを確認できるようにする
+      - name: Upload E2E screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-screenshots
+          path: tests/Browser/Screenshots
+          if-no-files-found: ignore

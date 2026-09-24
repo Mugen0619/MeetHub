@@ -70,6 +70,8 @@ new #[Layout('layouts.guest')] class extends Component
 }; ?>
 
 <div>
+    <x-slot name="heading">新しいパスワードの設定</x-slot>
+
     <form wire:submit="resetPassword">
         <!-- Email Address -->
         <div>

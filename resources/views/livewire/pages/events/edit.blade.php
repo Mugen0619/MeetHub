@@ -52,7 +52,7 @@ new #[Layout('layouts.app')] class extends Component
 
 <div>
     <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 leading-tight">イベント編集</h2>
+        <h1 class="font-semibold text-xl text-gray-800 leading-tight">イベント編集</h1>
     </x-slot>
 
     <div class="py-12 space-y-6">
@@ -71,7 +71,7 @@ new #[Layout('layouts.app')] class extends Component
 
         <div class="max-w-3xl mx-auto sm:px-6 lg:px-8">
             <div class="p-4 sm:p-8 bg-white shadow sm:rounded-lg">
-                <h3 class="text-lg font-medium text-gray-900">イベントの削除</h3>
+                <h2 class="text-lg font-medium text-gray-900">イベントの削除</h2>
                 <p class="mt-1 text-sm text-gray-600">削除したイベントは元に戻せません。</p>
                 <x-danger-button type="button" class="mt-4" wire:click="delete" wire:confirm="このイベントを削除します。よろしいですか?">
                     削除する

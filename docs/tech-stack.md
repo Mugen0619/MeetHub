@@ -57,7 +57,8 @@ Livewireはサーバーサイドでレンダリングした画面をAjaxで部�
 |---|---|---|
 | Pest | 5.0系 | 単体テスト・統合テストに使用(PHPUnit 13ベース)。従来案のVitestに相当 |
 | pestphp/pest-plugin-laravel | 5.0系 | LaravelアプリのテストをPest構文で書くための統合プラグイン |
-| pestphp/pest-plugin-browser | 5.0系 | Playwrightドライバを内蔵したPestのブラウザテスト機能。代表的なユーザージャーニー・アクセシビリティ検査のE2Eテストに使用する。Laravel Duskは、ChromeDriverのバージョン管理が不要でCI実行も高速・安定するPestのブラウザテストを優先し不採用とした |
+| pestphp/pest-plugin-browser | 5.0系(`^5.0`) | Playwrightを操作するPestのブラウザテスト機能。代表的なユーザージャーニー・アクセシビリティ検査のE2Eテスト(`tests/Browser`)に使用する。Laravel Duskは、ChromeDriverのバージョン管理が不要でCI実行も高速・安定するPestのブラウザテストを優先し不採用とした。PHPの`sockets`拡張が必要(`Dockerfile`・CIで有効化)。アクセシビリティ検査(`assertNoAccessibilityIssues()`)は、プラグインに同梱のaxe-core 4.10系をページに注入して実行する |
+| Playwright(npm) | 1.63系(`^1.63.0`) | pest-plugin-browserが内部で使うブラウザ自動操作ツール(本書の当初案では「プラグインに内蔵」としていたが、実際はnpmパッケージとして別途導入が必要で、プラグインは1.62.1以上を要求する)。ブラウザはChromiumのみを使い、`Dockerfile`・CIでインストールする |
 | larastan/larastan(PHPStan) | 3.12系 | 静的解析。Eloquentモデル・リレーション等のLaravel固有の型推論に対応(Checkstyleに相当するLint) |
 | Laravel Pint | 1.27系以降 | コードスタイルの自動整形 |
 | laravel/pao | 1.0系 | 「Agent-optimized output for PHP testing tools」。PHPUnit/Pest/PHPStan/Rector等のCLI出力を、AIコーディングエージェント(Claude Code等)が読み取りやすい形式に整形する公式パッケージ。`laravel/laravel`スケルトンの標準devDependencyとして最初から含まれており、明示的に選定したものではない。テスト結果・挙動そのものには影響しない |
