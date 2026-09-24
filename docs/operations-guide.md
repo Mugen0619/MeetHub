@@ -13,7 +13,7 @@
 tail -f storage/logs/laravel.log
 ```
 
-`jq`があると、フィールドを指定した絞り込み・整形が簡単に書ける(以下の例では`grep`版と`jq`版を併記する)。AWSデプロイ後のログ収集基盤(CloudWatch Logs等)での検索方法は、AWS本番デプロイのIssueで別途整理する。
+`jq`があると、フィールドを指定した絞り込み・整形が簡単に書ける(以下の例では`grep`版と`jq`版を併記する)。本番(AWS)での検索方法は[本番(CloudWatch Logs)での検索](#本番cloudwatch-logsでの検索)を参照。
 
 ## ログの読み方
 
@@ -80,6 +80,43 @@ jq -c 'select(.message == "login failed" and .context.targetUserId == 7) | {date
 jq -c 'select(.message == "http request completed" and .context.durationMs >= 1000) | {datetime, endpoint: .context.endpoint, durationMs: .context.durationMs, traceId: .context.traceId}' storage/logs/laravel.log
 ```
 
+## 本番(CloudWatch Logs)での検索
+
+本番(AWS)のログは、CloudWatch Logsのロググループ`/ecs/meethub-app`に集約している([infrastructure.md](./infrastructure.md#ログ))。Laravelの構造化ログ(JSON)に加えて、Nginx・PHP-FPMのエラーログ、コンテナ起動時の出力(設定のキャッシュ・マイグレーション)も同じロググループに入る。
+
+```bash
+# 直近のログを追う
+aws logs tail /ecs/meethub-app --follow --region ap-northeast-1
+
+# 特定の文字列を含むログだけを表示する(例: ログイン失敗)
+aws logs tail /ecs/meethub-app --since 1h --filter-pattern '"login failed"' --region ap-northeast-1
+```
+
+Git Bash(Windows)で実行する場合、`/ecs/...`がWindowsのパスに変換されてしまうため、先頭に`MSYS_NO_PATHCONV=1`を付ける。
+
+集計や絞り込みは、AWSコンソールのCloudWatch Logs Insightsを使う。JSONのフィールドは自動で解析され、入れ子のフィールドも`context.userId`のように指定できる。以下はいずれも本番環境で動作を確認したクエリ。
+
+```
+# 特定のリクエストを1件だけ追う(traceIdはレスポンスヘッダー X-Trace-Id でも確認できる)
+fields @timestamp, level_name, message, context.userId
+| filter context.traceId = "638531a6-9a5d-43d8-b010-aafee375ede0"
+| sort @timestamp asc
+
+# 参加申込みの履歴(申込み・拒否・取消し)
+fields @timestamp, message, context.userId, context.eventId, context.reason
+| filter message like /participation/
+| sort @timestamp asc
+
+# WARNING・ERRORの件数を種類ごとに集計する
+filter level_name in ["WARNING", "ERROR"]
+| stats count(*) by level_name, message
+
+# エンドポイントごとのリクエスト数・平均/最大の処理時間
+filter message = "http request completed"
+| stats count(*) as n, avg(context.durationMs) as avg_ms, max(context.durationMs) as max_ms by context.endpoint
+| sort n desc
+```
+
 ## よくあるエラーパターンと確認すべきログ項目
 
 | 症状 | まず確認するログ | 典型的な原因 |
@@ -90,7 +127,7 @@ jq -c 'select(.message == "http request completed" and .context.durationMs >= 10
 | 419(Page Expired)になる | アクセスログの`httpStatus`が419 | セッション切れ・CSRFトークンの不一致(長時間放置した画面からの操作) |
 | レスポンスが遅い | アクセスログの`durationMs`の分布、同じ`endpoint`での傾向 | N+1クエリ、DBのロック待ち(参加申込みの悲観ロック等) |
 | 原因不明の500 | `ERROR`レベルのログの`context.exception`(クラス・メッセージ・スタックトレース) | 実装バグ、想定外のnull、DB接続エラー・制約違反 |
-| ALBのヘルスチェックが失敗する | `endpoint`が`/health`で`httpStatus`が503のアクセスログ。ローカルでは`/health/details`で失敗したチェックを確認する | DB接続障害、キャッシュ(DB)の読み書き失敗 |
+| ALBのヘルスチェックが失敗する | `/health`はDBを確認しないため、失敗するのはタスク自体が応答できない場合(起動失敗・PHP-FPM/Nginxの停止)。CloudWatch LogsでNginx・PHP-FPMのエラーログ、起動時(`php artisan optimize`・マイグレーション)のエラーを確認する。DBの状態は`/health/details`で失敗したチェックを確認する | DB接続障害、キャッシュ(DB)の読み書き失敗 |
 
 ## 簡易インシデント対応の流れ
 
@@ -107,7 +144,7 @@ jq -c 'select(.message == "http request completed" and .context.durationMs >= 10
 
 現時点では、外部監視ツール(Datadog等)との連携は対象外とし、ログの構造化(JSON化)までを実施している。将来導入する場合、概ね以下の作業が必要になる見込み。
 
-- **ログ収集**: ECS Fargateでは標準出力(stderr)へのJSON出力に切り替え、CloudWatch Logs(awslogsドライバー)またはFireLens経由で転送する(`config/logging.php`に`stderr`へJSONで出力するチャンネルを追加する)
+- **ログ転送**: 本番のログは既にCloudWatch Logs(awslogsドライバー)に集約している([infrastructure.md](./infrastructure.md))。外部ツールへは、CloudWatch Logsのサブスクリプションフィルター、またはFireLens(ECSのログルーター)経由で転送する
 - **ログのパース設定**: 現状のJSON構造(`datetime`, `level_name`, `context.traceId`, `context.userId`等)を監視ツール側でどう解釈させるかの設定。フィールド名(`datetime`→`@timestamp`等)のマッピング調整が必要になることがある
 - **分散トレーシングへの拡張**: 現状の`traceId`はリクエスト単位のシンプルなUUIDで、W3C Trace Context等の標準には準拠していない。複数サービスにまたがるトレーシングが必要になった場合は、OpenTelemetry等の導入を検討する
 - **アラート設定**: `ERROR`ログの発生、5xxエラー率、`durationMs`の閾値超過、ヘルスチェック失敗に対するアラート・ダッシュボードの構築

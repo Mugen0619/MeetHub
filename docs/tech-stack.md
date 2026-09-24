@@ -74,8 +74,15 @@ Livewireはサーバーサイドでレンダリングした画面をAjaxで部�
 
 | 技術 | バージョン | 備考 |
 |---|---|---|
-| Docker | ビルド確認は最新安定版 | バックエンド(Laravelアプリ)をECS Fargateへデプロイするためのコンテナ化(`Dockerfile`) |
-| PHPベースイメージ | php:8.5-fpm(公式イメージ) | マルチステージビルドを想定(ビルドステージでComposer/Node.jsによる依存解決・アセットビルドを行い、実行イメージにはNode.jsを含めない)。PHP-FPMの前段にNginxを配置する構成とする(詳細は実装フェーズで設計) |
+| Docker | ビルド確認は最新安定版 | 開発用(リポジトリ直下の`Dockerfile`、`php artisan serve`)と、ECS Fargateへデプロイする本番用(`docker/production/Dockerfile`)を分けている |
+| PHPベースイメージ(本番) | php:8.5-fpm(公式イメージ) | マルチステージビルド(Composerで本番用の依存解決 → `node:22-slim`でアセットビルド → PHP-FPM + Nginxの実行イメージ。実行イメージにはNode.js・Composerを含めない)。Nginx(Debian 13のパッケージ)とPHP-FPMを1つのコンテナで動かす。PHP拡張の導入には`mlocati/php-extension-installer`を使う。詳細は[infrastructure.md](./infrastructure.md#本番用dockerイメージ) |
+
+## インフラ(AWS)
+
+| 技術 | バージョン | 備考 |
+|---|---|---|
+| Terraform | 1.15系 | 本番環境のインフラ構成をコードで管理する(`infra/production/`)。AWS provider 6系・random provider 3系 |
+| AWS | - | CloudFront(HTTPS、デフォルトドメイン)→ ALB → ECS Fargate(1 vCPU / 2GB)+ RDS(PostgreSQL 17、`db.t4g.micro`)+ S3(画像)+ Secrets Manager + ECR + CloudWatch Logs。構成・判断の理由は[infrastructure.md](./infrastructure.md)を参照 |
 
 ## CI/CD
 
