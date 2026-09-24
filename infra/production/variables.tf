@@ -81,8 +81,13 @@ variable "app_image_tag" {
 
 # --- CD(GitHub Actions) ---
 
-variable "github_repository" {
-  description = "CDのワークフローを実行するGitHubリポジトリ(owner/repo)。このリポジトリのmainブランチのみデプロイ用ロールを引き受けられる"
+variable "github_oidc_subject_repository" {
+  description = <<-EOT
+    CDのワークフローを実行するGitHubリポジトリの、OIDCトークンのsubでの表記。
+    このリポジトリは immutable subject(owner@オーナーID/repo@リポジトリID)が有効なため、IDを含む形式になる
+    (`gh api repos/Mugen0619/MeetHub/actions/oidc/customization/sub` の sub_claim_prefix で確認できる)。
+    このリポジトリのmainブランチのみデプロイ用ロールを引き受けられる
+  EOT
   type        = string
-  default     = "Mugen0619/MeetHub"
+  default     = "Mugen0619@169164098/MeetHub@1381513568"
 }
