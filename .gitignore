@@ -28,3 +28,6 @@ Thumbs.db
 
 # k6負荷試験のHTMLレポート(実行のたびに生成される成果物)
 /k6/report/*.html
+
+# Pestのブラウザテスト(E2E)が失敗時に保存するスクリーンショット
+/tests/Browser/Screenshots/

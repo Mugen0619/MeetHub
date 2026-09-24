@@ -27,6 +27,12 @@ pest()->extend(TestCase::class)
     ->use(DatabaseTruncation::class)
     ->in('Concurrency');
 
+// E2Eテスト(Pestのブラウザテスト)。ブラウザからのリクエストはテストと同じプロセス内のHTTPサーバーで処理され、
+// テストと同じDB接続を使うため、RefreshDatabase(トランザクション)で作ったデータが画面にもそのまま表示される
+pest()->extend(TestCase::class)
+    ->use(RefreshDatabase::class)
+    ->in('Browser');
+
 /*
 |--------------------------------------------------------------------------
 | Expectations
@@ -56,6 +62,16 @@ expect()->extend('toBeOne', function () {
 function something()
 {
     // ..
+}
+
+/**
+ * E2Eテスト用: 以降に表示される確認ダイアログ(wire:confirmが使うwindow.confirm)で「OK」を押したことにする。
+ * Playwrightは既定でダイアログを閉じる(キャンセル扱い)ため、そのままでは削除・取消し等の操作が実行されない。
+ * ページを再読み込みすると元に戻るため、確認ダイアログが出る操作の直前に呼ぶ。
+ */
+function acceptConfirmDialogs(mixed $page): void
+{
+    $page->script('() => { window.confirm = () => true; }');
 }
 
 /**

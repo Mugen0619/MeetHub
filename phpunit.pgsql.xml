@@ -6,7 +6,7 @@
 >
     <!-- PostgreSQL(本番と同じDB製品)でテストを実行するための設定。
          通常のテスト(phpunit.xml)はSQLiteのインメモリDBで高速に実行するが、行ロック等の挙動はDB製品ごとに異なるため、
-         同時実行制御のテスト(tests/Concurrency)はこちらでのみ実行する。
+         同時実行制御のテスト(tests/Concurrency)と、E2Eテスト(tests/Browser、Pestのブラウザテスト)はこちらでのみ実行する。
          実行方法はREADME.mdの「テストの実行」を参照。
          接続先ホスト等(DB_HOST・DB_USERNAME・DB_PASSWORD)は.envまたは環境変数の値を使う。 -->
     <testsuites>
@@ -18,6 +18,9 @@
         </testsuite>
         <testsuite name="Concurrency">
             <directory>tests/Concurrency</directory>
+        </testsuite>
+        <testsuite name="Browser">
+            <directory>tests/Browser</directory>
         </testsuite>
     </testsuites>
     <source>
