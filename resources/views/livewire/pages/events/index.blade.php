@@ -60,9 +60,9 @@ new #[Layout('layouts.app')] class extends Component
 
 <div>
     <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 leading-tight">
+        <h1 class="font-semibold text-xl text-gray-800 leading-tight">
             イベント一覧
-        </h2>
+        </h1>
     </x-slot>
 
     <div class="py-12">
@@ -106,7 +106,7 @@ new #[Layout('layouts.app')] class extends Component
                                             {{ $event->starts_at->format('Y/m/d H:i') }}
                                         </time>
                                     </p>
-                                    <h3 class="text-lg font-semibold text-gray-900">{{ $event->title }}</h3>
+                                    <h2 class="text-lg font-semibold text-gray-900">{{ $event->title }}</h2>
                                     <p class="text-sm text-gray-600">場所: {{ $event->location }}</p>
                                 </div>
                             </a>
