@@ -143,5 +143,11 @@ resource "aws_ecs_service" "app" {
 
   depends_on = [aws_lb_listener.http]
 
+  # デプロイ(サービスが使うタスク定義のリビジョンの切り替え)はCD(.github/workflows/cd.yml)が行う。
+  # Terraformの差分対象にすると、インフラ変更のapplyのたびにTerraformが登録したリビジョン(古いイメージ)へ戻してしまうため除外する
+  lifecycle {
+    ignore_changes = [task_definition]
+  }
+
   tags = { Name = "${var.project_name}-app" }
 }
