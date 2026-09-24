@@ -9,6 +9,7 @@
 - [構造化ログ・ヘルスチェック](./docs/observability.md)
 - [運用ガイド(ログ調査・簡易インシデント対応)](./docs/operations-guide.md)
 - [k6負荷試験](./k6/README.md)
+- [インフラ構成(AWS本番環境)](./docs/infrastructure.md)・[構築・デプロイ手順](./infra/production/README.md)
 
 ## 技術スタック(概要)
 

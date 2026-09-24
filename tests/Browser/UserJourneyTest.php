@@ -62,7 +62,8 @@ test('主催者: 新規登録 → イベント作成 → 編集 → 削除', fun
         ->assertSee('まだ主催しているイベントはありません。')
         ->assertNoJavaScriptErrors();
 
-    expect(Event::count())->toBe(0);
+    // 他のテスト(コミットしてデータを残す同時実行テスト等)の影響を受けないよう、作成したイベントに絞って確認する
+    expect(Event::where('title', 'like', 'E2E勉強会%')->exists())->toBeFalse();
 });
 
 test('参加者: 新規登録 → イベント一覧から詳細 → いいね → コメント → 参加申込み → 参加予定一覧で確認 → 取消し', function () {

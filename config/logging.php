@@ -79,6 +79,22 @@ return [
             ],
         ],
 
+        // 本番(ECS Fargate)用の構造化ログ。jsonチャンネルと同じ形式で標準エラー出力に書き、
+        // ECSのログドライバ(awslogs)経由でCloudWatch Logsに集約する(docs/infrastructure.md)
+        'json_stderr' => [
+            'driver' => 'monolog',
+            'level' => env('LOG_LEVEL', 'debug'),
+            'handler' => StreamHandler::class,
+            'handler_with' => [
+                'stream' => 'php://stderr',
+            ],
+            'formatter' => JsonFormatter::class,
+            'formatter_with' => [
+                'includeStacktraces' => true,
+            ],
+            'processors' => [PsrLogMessageProcessor::class],
+        ],
+
         'daily' => [
             'driver' => 'daily',
             'path' => storage_path('logs/laravel.log'),

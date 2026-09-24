@@ -23,19 +23,34 @@ test('正常なヘルスチェックはアクセスログに記録しない', fu
     expect(findJsonLogs($this->logPath, 'http request completed'))->toBeEmpty();
 });
 
-test('チェックが失敗した場合は503を返し、アクセスログに記録する', function () {
+/**
+ * DB接続のチェックが失敗する状態にする(RDSの障害を想定)。
+ */
+function breakDatabaseCheck(): void
+{
     config(['database.connections.broken' => [
         'driver' => 'sqlite',
         'database' => '/nonexistent/meethub.sqlite',
     ]]);
     Health::clearChecks()->checks([DatabaseCheck::new()->connectionName('broken')]);
+}
+
+test('DBに接続できなくても、ALB・ECS用のヘルスチェックは200を返す(DB障害でタスクを入れ替え続けないため)', function () {
+    breakDatabaseCheck();
 
     $this->get('/health')
-        ->assertStatus(503)
-        ->assertDontSee('nonexistent');
+        ->assertOk()
+        ->assertExactJson(['healthy' => true]);
+});
 
-    expect(findJsonLogs($this->logPath, 'http request completed')[0]['context'])
-        ->toMatchArray(['httpStatus' => 503, 'endpoint' => '/health']);
+test('DBに接続できない場合、詳細エンドポイントでは失敗したチェックを確認できる', function () {
+    config(['health.expose_details' => true]);
+    breakDatabaseCheck();
+
+    $response = $this->get('/health/details')->assertOk();
+
+    expect($response->json('checkResults.0'))
+        ->toMatchArray(['name' => 'Database', 'status' => 'failed']);
 });
 
 test('ヘルスチェックはセッションを開始しない(ALBからのリクエストでセッションを作らない)', function () {
