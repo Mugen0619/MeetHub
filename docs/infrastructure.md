@@ -35,7 +35,7 @@ ECS Fargate タスク(プライベートサブネット)
 ブラウザ ──(署名付きURLでPUT / 画像の表示でGET)──▶ S3(画像バケット)
 ```
 
-画像のアップロードは、Livewireの一時ファイルアップロード機能により、ブラウザからS3へ署名付きURLで直接PUTする(画像データがアプリを経由しない。[tech-stack.md](./tech-stack.md#ストレージ--aws連携))。保存が確定した画像(`events/`)はS3のURLで直接表示する。
+画像のアップロードは、Livewireの一時ファイルアップロード機能により、ブラウザからS3へ署名付きURLで直接PUTする(画像データがアプリを経由しない。[tech-stack.md](./tech-stack.md#ストレージ--aws連携))。保存が確定した画像(イベント画像は`events/`、ユーザーのアイコンは`avatars/`)はS3のURLで直接表示する。
 
 ## リソース一覧
 
@@ -47,7 +47,7 @@ ECS Fargate タスク(プライベートサブネット)
 | ECS Fargate | 1 vCPU / 2GB、X86_64、タスク数1。デプロイ失敗時の自動ロールバック(サーキットブレーカー)、ECS Exec有効 | `ecs.tf` |
 | ECR | タグの上書き不可(コミットハッシュをタグにする)、直近10世代を保持、push時に脆弱性スキャン | `ecr.tf` |
 | RDS | PostgreSQL 17、`db.t4g.micro`、gp3 20GB、Single-AZ、ストレージ暗号化、非公開、自動バックアップ1日 | `rds.tf` |
-| S3(画像) | `events/*`のみ一般公開(バケットポリシー。ACLは無効)、`livewire-tmp/`は非公開で1日後に自動削除。CORSはCloudFrontのURLからのPUTのみ許可 | `s3.tf` |
+| S3(画像) | `events/*`(イベント画像)・`avatars/*`(ユーザーのアイコン)のみ一般公開(バケットポリシー。ACLは無効)、`livewire-tmp/`は非公開で1日後に自動削除。CORSはCloudFrontのURLからのPUTのみ許可 | `s3.tf` |
 | Secrets Manager | `APP_KEY`(Terraformが生成した32バイトの乱数)、DBパスワード | `secrets.tf` |
 | IAM | タスク実行ロール(ECR・CloudWatch Logs・Secrets Manager)、タスクロール(画像バケットへのPut/Get/Delete/List、ECS Exec) | `iam.tf` |
 | IAM(CD) | GitHub ActionsのOIDCプロバイダ、デプロイ用ロール(`meethub-github-actions-deploy`。ECRへのpush・タスク定義の登録・サービスの更新のみ) | `github_oidc.tf` |

@@ -8,7 +8,7 @@
 
 | エンティティ | 主なカラム | 備考 |
 |---|---|---|
-| User | id, username, email, password_hash, display_name, bio, avatar_url, created_at | |
+| User | id, username, email, password_hash, display_name, bio, avatar_url, created_at | bioは自己紹介(任意、1000文字まで)。avatar_urlはEventのimage_urlと同じく、公開URLではなくディスク上の保存パス(例: `avatars/xxx.png`)を保存し、Userモデルのアクセサで公開URLに変換して返す。アイコンの差し替え・削除・退会時は画像ファイルも削除する |
 | Event | id, organizer_id(FK→User), title, description, location, starts_at, capacity, image_url, created_at, updated_at | organizer_idがイベント主催者。capacityは定員(1以上の整数、NOT NULL。無制限[null]は許容しないことをIssue #8で決定)。image_urlには公開URLではなく、ディスク上の保存パス(例: `events/xxx.jpg`)を保存し、Eventモデルのアクセサで現在のディスク(`FILESYSTEM_DISK`)の公開URLに変換して返す(ローカル/S3の切り替えでDBの値を書き換えずに済むようにするため)。イベント削除時は画像ファイルも削除する(ただし下記の主催者アカウント削除による連鎖削除ではモデルイベントが発火しないため、画像ファイルは残る)。organizer_idは`ON DELETE CASCADE`とし、**主催者がアカウントを削除した場合、そのユーザーが主催する全イベント(および紐づくコメント・いいね・参加申込み)も連鎖削除される**(意図した仕様。他の参加者への通知は行わない。今回の課題規模では許容する判断とした) |
 | EventLike | id, event_id(FK), user_id(FK), created_at | 「興味あり」。event_id + user_idでユニーク制約。付け外しのみで更新しないためupdated_atは持たない。event_id・user_idとも`ON DELETE CASCADE` |
 | Comment | id, event_id(FK), user_id(FK), body, created_at | bodyは1000文字以内(Issue #12で決定)。編集機能を持たないためupdated_atは持たない。削除は投稿者本人のみ(イベント主催者も他人のコメントは削除不可)。event_id・user_idとも`ON DELETE CASCADE` |

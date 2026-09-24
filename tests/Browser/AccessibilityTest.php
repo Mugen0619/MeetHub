@@ -18,6 +18,12 @@ use App\Models\User;
 
 const ALL_ACCESSIBILITY_ISSUES = 3;
 
+test('トップページ', function () {
+    visit('/')
+        ->assertSee('MeetHub')
+        ->assertNoAccessibilityIssues(ALL_ACCESSIBILITY_ISSUES);
+});
+
 test('ログイン画面', function () {
     visit('/login')
         ->assertSee('Log in')
@@ -69,5 +75,13 @@ test('プロフィール画面', function () {
 
     visit("/users/{$user->username}")
         ->assertSee($user->display_name)
+        ->assertNoAccessibilityIssues(ALL_ACCESSIBILITY_ISSUES);
+});
+
+test('プロフィール編集画面', function () {
+    $this->actingAs(User::factory()->create(['bio' => 'アクセシビリティ検査用の自己紹介']));
+
+    visit('/profile')
+        ->assertSee('自己紹介')
         ->assertNoAccessibilityIssues(ALL_ACCESSIBILITY_ISSUES);
 });
