@@ -147,7 +147,7 @@ MeetHubはLivewireで画面も1つのLaravelアプリが担い、フロントエ
 
 設計上の判断:
 
-- **認証はOIDC**: 長期間有効なアクセスキーをGitHub Secretsに置かず、GitHub ActionsのOIDCトークンでIAMロールを引き受ける(1時間で失効する一時的な認証情報)。ロールの信頼ポリシーは`repo:Mugen0619/MeetHub:ref:refs/heads/main`に限定し、PRのブランチや他のリポジトリからは引き受けられない。権限はECRの`meethub-app`へのpush、タスク定義の取得・登録、`meethub-app`サービスの更新・参照、タスク実行ロール・タスクロールのPassRole(ECSタスクに渡す場合のみ)に絞っている
+- **認証はOIDC**: 長期間有効なアクセスキーをGitHub Secretsに置かず、GitHub ActionsのOIDCトークンでIAMロールを引き受ける(1時間で失効する一時的な認証情報)。ロールの信頼ポリシーはトークンの`sub`が`repo:Mugen0619@169164098/MeetHub@1381513568:ref:refs/heads/main`の場合に限定し、PRのブランチや他のリポジトリからは引き受けられない。このリポジトリはGitHubのimmutable subjectが有効なため、`sub`はオーナー・リポジトリのIDを含む形式になる(`gh api repos/Mugen0619/MeetHub/actions/oidc/customization/sub`で確認できる)。名前だけの形式(`repo:Mugen0619/MeetHub:...`)と違い、リポジトリ名の変更や、削除後に同名で作り直されたリポジトリからは引き受けられない。権限はECRの`meethub-app`へのpush、タスク定義の取得・登録、`meethub-app`サービスの更新・参照、タスク実行ロール・タスクロールのPassRole(ECSタスクに渡す場合のみ)に絞っている
 - **CIで検証したコミットをデプロイする**: `workflow_run`では`github.sha`が「CD開始時点のmainの先頭」になり、CIが検証したコミットと異なりうるため、`github.event.workflow_run.head_sha`をチェックアウト・タグ付けに使う。mainへの`push`で動いたCIの場合のみ実行する(フォークの`main`ブランチからのPRで動いたCIでは動かさない)
 - **タグはコミットハッシュ(上書き不可)**: ECRはタグの上書きを禁止しているため、`latest`の上書きではなく、デプロイのたびに一意なタグでpushし、タスク定義の新しいリビジョンを登録する。同じコミットの再実行時は、push済みのイメージを使う
 - **Terraformとの管理の分担**: Terraformはタスク定義の「ベース」(環境変数・秘密情報・CPU/メモリ・ロール等)を管理し、CDはイメージの差し替えとサービスが使うリビジョンの切り替えを担う。ECSサービスの`task_definition`はTerraformの差分対象から外している(`lifecycle.ignore_changes`)。外さないと、インフラ変更のたびの`terraform apply`で、Terraformが登録したリビジョン(古いイメージ)に戻ってしまう。環境変数等をTerraformで変更した場合は、次のCDで(最新リビジョンをもとにするため)反映される

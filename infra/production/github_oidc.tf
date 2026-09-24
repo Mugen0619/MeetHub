@@ -25,11 +25,12 @@ data "aws_iam_policy_document" "github_actions_assume_role" {
       values   = ["sts.amazonaws.com"]
     }
 
-    # mainブランチで動くワークフローのみ引き受けられる(PRのブランチや他のリポジトリからは不可)
+    # mainブランチで動くワークフローのみ引き受けられる(PRのブランチや他のリポジトリからは不可)。
+    # subはオーナー・リポジトリのIDを含む形式のため、リポジトリ名の変更や、削除後に同名で作り直されたリポジトリからも引き受けられない
     condition {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${var.github_repository}:ref:refs/heads/main"]
+      values   = ["repo:${var.github_oidc_subject_repository}:ref:refs/heads/main"]
     }
   }
 }
