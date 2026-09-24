@@ -31,3 +31,11 @@ Thumbs.db
 
 # Pestのブラウザテスト(E2E)が失敗時に保存するスクリーンショット
 /tests/Browser/Screenshots/
+
+# Terraform(状態ファイル・変数ファイルには秘密情報が含まれうるため、Git管理しない。.terraform.lock.hclは管理する)
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log

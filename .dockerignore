@@ -1,0 +1,25 @@
+# 本番用イメージ(docker/production/Dockerfile)のビルドコンテキストから除外するもの。
+# 秘密情報(.env)や、ビルド時に作り直すもの(vendor・node_modules・public/build)をイメージに含めない。
+.git
+.github
+.env
+.env.*
+!.env.example
+node_modules
+vendor
+public/build
+public/hot
+public/storage
+storage/logs/*
+storage/framework/cache/data/*
+storage/framework/sessions/*
+storage/framework/views/*
+storage/framework/testing/*
+bootstrap/cache/*.php
+tests
+k6
+infra
+docs
+*.log
+.phpunit.cache
+.phpunit.result.cache
