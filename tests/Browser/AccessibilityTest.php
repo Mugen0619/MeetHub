@@ -26,13 +26,13 @@ test('トップページ', function () {
 
 test('ログイン画面', function () {
     visit('/login')
-        ->assertSee('Log in')
+        ->assertSee('ログイン状態を保持する')
         ->assertNoAccessibilityIssues(ALL_ACCESSIBILITY_ISSUES);
 });
 
 test('登録画面', function () {
     visit('/register')
-        ->assertSee('Register')
+        ->assertSee('登録する')
         ->assertNoAccessibilityIssues(ALL_ACCESSIBILITY_ISSUES);
 });
 

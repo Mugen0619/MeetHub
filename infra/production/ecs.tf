@@ -25,6 +25,8 @@ locals {
     APP_ENV   = "production"
     APP_DEBUG = "false"
     APP_URL   = local.app_url
+    # 画面の文言(lang/ja.json・lang/ja/*.php)を日本語にする
+    APP_LOCALE = "ja"
 
     # 構造化ログを標準エラー出力へ(awslogsドライバでCloudWatch Logsへ送る)。本番はDEBUGを出さない
     LOG_CHANNEL              = "json_stderr"
