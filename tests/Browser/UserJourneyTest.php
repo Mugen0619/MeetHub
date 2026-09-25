@@ -149,8 +149,11 @@ test('フォロー: ログイン → 主催者をフォロー → 「フォロ�
         ->assertDontSee('他の人のイベント');
 
     // フォローを解除すると、「フォロー中」タブに表示されなくなる
+    // 一覧にも主催者名のリンクがあるため、詳細画面への遷移(wire:navigate)が終わるのを待ってから主催者名を押す
     $page->click('フォロー先のイベント')
+        ->assertSee('参加人数')
         ->click('フォローする主催者')
+        ->assertPathIs("/users/{$followed->username}")
         ->press('フォロー解除')
         // 主催者名(「フォローする主催者」)に部分一致しないよう、ボタンのロールと名前で確認する
         ->assertVisible('internal:role=button[name="フォローする"s]');
