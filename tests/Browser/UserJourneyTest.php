@@ -26,7 +26,7 @@ test('主催者: 新規登録 → イベント作成 → 編集 → 削除', fun
         ->fill('email', 'organizer@example.com')
         ->fill('password', 'password123')
         ->fill('password_confirmation', 'password123')
-        ->press('Register')
+        ->press('登録する')
         ->assertPathIs('/dashboard')
         ->assertSee('まだ主催しているイベントはありません。');
 
@@ -80,7 +80,7 @@ test('参加者: 新規登録 → イベント一覧から詳細 → いいね �
         ->fill('email', 'participant@example.com')
         ->fill('password', 'password123')
         ->fill('password_confirmation', 'password123')
-        ->press('Register')
+        ->press('登録する')
         ->assertPathIs('/dashboard');
 
     // イベント一覧から詳細画面を開く
@@ -129,7 +129,8 @@ test('フォロー: ログイン → 主催者をフォロー → 「フォロ�
     $page = visit('/login')
         ->fill('email', 'follower@example.com')
         ->fill('password', 'password')
-        ->press('Log in')
+        // 見出し(h1)も「ログイン」のため、テキストではなく送信ボタンを指定して押す
+        ->press('button[type="submit"]')
         ->assertPathIs('/dashboard');
 
     // イベント一覧から主催者のプロフィールを開いてフォローする

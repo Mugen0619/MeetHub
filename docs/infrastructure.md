@@ -118,6 +118,7 @@ ECSタスク定義で設定する(`infra/production/ecs.tf`の`app_environment`)
 |---|---|---|
 | `APP_ENV` / `APP_DEBUG` | `production` / `false` | エラー画面に詳細を出さない |
 | `APP_URL` | `https://<CloudFrontのドメイン>` | `https://`のため、URLは常にhttpsで生成される |
+| `APP_LOCALE` | `ja` | 画面の文言(Breeze由来の画面・認証メッセージ・ページネーション)を日本語にする(`lang/ja.json`・`lang/ja/*.php`)。ローカルの`.env.example`も`ja` |
 | `APP_KEY` | (Secrets Manager) | |
 | `LOG_CHANNEL` / `LOG_LEVEL` | `json_stderr` / `info` | 構造化ログを標準エラー出力へ出し、awslogsドライバでCloudWatch Logsに集約する([observability.md](./observability.md)) |
 | `DB_HOST`等 / `DB_PASSWORD` | RDSのエンドポイント / (Secrets Manager) | RDS(PostgreSQL 17)は既定でSSL接続を必須とするが、Laravelの既定(`sslmode=prefer`)でSSL接続される |

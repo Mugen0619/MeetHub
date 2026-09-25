@@ -21,6 +21,8 @@
         <!-- force="true" is required because docker-compose injects .env (APP_ENV=local) as real
              container env vars, which PHPUnit's <env> would otherwise not override. -->
         <env name="APP_ENV" value="testing" force="true"/>
+        <!-- 画面の文言は本番と同じく日本語(lang/ja.json)で検証する -->
+        <env name="APP_LOCALE" value="ja" force="true"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file" force="true"/>
         <env name="BCRYPT_ROUNDS" value="4" force="true"/>
         <env name="BROADCAST_CONNECTION" value="null" force="true"/>
